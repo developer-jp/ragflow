@@ -25,12 +25,12 @@ const ChatIdModal = ({
       <Paragraph copyable={{ text: id }} className={styles.id}>
         {id}
       </Paragraph>
-      <Link
+      {/* <Link
         href="https://ragflow.io/docs/dev/http_api_reference#create-session-with-chat-assistant"
         target="_blank"
       >
         {t('howUseId')}
-      </Link>
+      </Link> */}
     </Modal>
   );
 };
