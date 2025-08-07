@@ -35,17 +35,31 @@ export const useNavigatePage = () => {
     navigate(Routes.Chats);
   }, [navigate]);
 
-  const navigateToChat = useCallback(() => {
-    navigate(Routes.Chat);
+  const navigateToChat = useCallback(
+    (id: string) => () => {
+      navigate(`${Routes.Chat}/${id}`);
+    },
+    [navigate],
+  );
+
+  const navigateToAgents = useCallback(() => {
+    navigate(Routes.Agents);
   }, [navigate]);
 
   const navigateToAgentList = useCallback(() => {
-    navigate(Routes.Agents);
+    navigate(Routes.AgentList);
   }, [navigate]);
 
   const navigateToAgent = useCallback(
     (id: string) => () => {
       navigate(`${Routes.Agent}/${id}`);
+    },
+    [navigate],
+  );
+
+  const navigateToAgentLogs = useCallback(
+    (id: string) => () => {
+      navigate(`${Routes.AgentLogPage}/${id}`);
     },
     [navigate],
   );
@@ -114,11 +128,13 @@ export const useNavigatePage = () => {
     navigateToChunkParsedResult,
     getQueryString,
     navigateToChunk,
-    navigateToAgentList,
+    navigateToAgents,
     navigateToAgent,
+    navigateToAgentLogs,
     navigateToAgentTemplates,
     navigateToSearchList,
     navigateToSearch,
     navigateToFiles,
+    navigateToAgentList,
   };
 };

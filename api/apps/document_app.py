@@ -32,7 +32,7 @@ from api.db.services.document_service import DocumentService, doc_upload_and_par
 from api.db.services.file2document_service import File2DocumentService
 from api.db.services.file_service import FileService
 from api.db.services.knowledgebase_service import KnowledgebaseService
-from api.db.services.task_service import TaskService, queue_tasks
+from api.db.services.task_service import TaskService, cancel_all_task_of, queue_tasks
 from api.db.services.user_service import UserTenantService
 from api.utils import get_uuid
 from api.utils.api_utils import (
@@ -166,6 +166,17 @@ def create():
         if DocumentService.query(name=req["name"], kb_id=kb_id):
             return get_data_error_result(message="Duplicated document name in the same knowledgebase.")
 
+        kb_root_folder = FileService.get_kb_folder(kb.tenant_id)
+        if not kb_root_folder:
+            return get_data_error_result(message="Cannot find the root folder.")
+        kb_folder = FileService.new_a_file_from_kb(
+            kb.tenant_id,
+            kb.name,
+            kb_root_folder["id"],
+        )
+        if not kb_folder:
+            return get_data_error_result(message="Cannot find the kb folder for this file.")
+
         doc = DocumentService.insert(
             {
                 "id": get_uuid(),
@@ -180,6 +191,9 @@ def create():
                 "size": 0,
             }
         )
+
+        FileService.add_file_from_kb(doc.to_dict(), kb_folder["id"], kb.tenant_id)
+
         return get_json_result(data=doc.to_json())
     except Exception as e:
         return server_error_response(e)
@@ -206,6 +220,8 @@ def list_docs():
         desc = False
     else:
         desc = True
+    create_time_from = int(request.args.get("create_time_from", 0))
+    create_time_to = int(request.args.get("create_time_to", 0))
 
     req = request.get_json()
 
@@ -225,6 +241,14 @@ def list_docs():
 
     try:
         docs, tol = DocumentService.get_by_kb_id(kb_id, page_number, items_per_page, orderby, desc, keywords, run_status, types, suffix)
+
+        if create_time_from or create_time_to:
+            filtered_docs = []
+            for doc in docs:
+                doc_create_time = doc.get("create_time", 0)
+                if (create_time_from == 0 or doc_create_time >= create_time_from) and (create_time_to == 0 or doc_create_time <= create_time_to):
+                    filtered_docs.append(doc)
+            docs = filtered_docs
 
         for doc_item in docs:
             if doc_item["thumbnail"] and not doc_item["thumbnail"].startswith(IMG_BASE64_PREFIX):
@@ -288,7 +312,7 @@ def docinfos():
 @manager.route("/thumbnails", methods=["GET"])  # noqa: F821
 # @login_required
 def thumbnails():
-    doc_ids = request.args.get("doc_ids").split(",")
+    doc_ids = request.args.getlist("doc_ids")
     if not doc_ids:
         return get_json_result(data=False, message='Lack of "Document ID"', code=settings.RetCode.ARGUMENT_ERROR)
 
@@ -420,26 +444,29 @@ def run():
                 info["chunk_num"] = 0
                 info["token_num"] = 0
 
-            e, doc = DocumentService.get_by_id(id)
-            if not e:
-                return get_data_error_result(message="Document not found!")
-            if doc.run == TaskStatus.DONE.value:
-                DocumentService.clear_chunk_num_when_rerun(doc.id)
-
-            DocumentService.update_by_id(id, info)
             tenant_id = DocumentService.get_tenant_id(id)
             if not tenant_id:
                 return get_data_error_result(message="Tenant not found!")
             e, doc = DocumentService.get_by_id(id)
             if not e:
                 return get_data_error_result(message="Document not found!")
+
+            if str(req["run"]) == TaskStatus.CANCEL.value:
+                if str(doc.run) == TaskStatus.RUNNING.value:
+                    cancel_all_task_of(id)
+                else:
+                    return get_data_error_result(message="Cannot cancel a task that is not in RUNNING status")
+
+            if str(req["run"]) == TaskStatus.RUNNING.value and str(doc.run) == TaskStatus.DONE.value:
+                DocumentService.clear_chunk_num_when_rerun(doc.id)
+
+            DocumentService.update_by_id(id, info)
             if req.get("delete", False):
                 TaskService.filter_delete([Task.doc_id == id])
                 if settings.docStoreConn.indexExist(search.index_name(tenant_id), doc.kb_id):
                     settings.docStoreConn.delete({"doc_id": id}, search.index_name(tenant_id), doc.kb_id)
 
             if str(req["run"]) == TaskStatus.RUNNING.value:
-                e, doc = DocumentService.get_by_id(id)
                 doc = doc.to_dict()
                 doc["tenant_id"] = tenant_id
 
