@@ -36,6 +36,13 @@ from rag.app.tag import label_question
 from rag.prompts.prompts import chunks_format
 
 
+def get_current_user_id():
+    """Get current user ID with validation"""
+    if not current_user or not hasattr(current_user, 'id') or not current_user.id:
+        return None
+    return current_user.id
+
+
 @manager.route("/set", methods=["POST"])  # noqa: F821
 @login_required
 def set_conversation():
@@ -151,9 +158,22 @@ def rm():
 def list_conversation():
     dialog_id = request.args["dialog_id"]
     try:
-        if not DialogService.query(tenant_id=current_user.id, id=dialog_id):
+        user_id = get_current_user_id()
+        if not user_id:
+            return get_data_error_result(message="User authentication required", code=settings.RetCode.AUTHENTICATION_ERROR)
+        
+        # Check if user has access to this dialog (owner or organization member with team permission)
+        tenants = TenantService.get_joined_tenants_by_user_id(user_id)
+        tenant_ids = [t["tenant_id"] for t in tenants]
+        
+        # Check if dialog exists and user has access
+        accessible_dialogs, _ = DialogService.get_organization_accessible(tenant_ids, user_id, 0, 0)
+        dialog_accessible = any(d['id'] == dialog_id for d in accessible_dialogs)
+        
+        if not dialog_accessible:
             return get_json_result(data=False, message="Only owner of dialog authorized for this operation.", code=settings.RetCode.OPERATING_ERROR)
-        convs = ConversationService.query(dialog_id=dialog_id, order_by=ConversationService.model.create_time, reverse=True)
+        # Only show current user's conversations, even for shared dialogs
+        convs = ConversationService.query(dialog_id=dialog_id, user_id=user_id, order_by=ConversationService.model.create_time, reverse=True)
 
         convs = [d.to_dict() for d in convs]
         return get_json_result(data=convs)
@@ -165,6 +185,10 @@ def list_conversation():
 @login_required
 @validate_request("conversation_id", "messages")
 def completion():
+    # Validate current_user
+    if not current_user or not hasattr(current_user, 'id'):
+        return get_data_error_result(message="User authentication required", code=settings.RetCode.AUTHENTICATION_ERROR)
+    
     req = request.json
     msg = []
     for m in req["messages"]:
@@ -200,7 +224,8 @@ def completion():
         def stream():
             nonlocal dia, msg, req, conv
             try:
-                for ans in chat(dia, msg, True, **req):
+                user_id = get_current_user_id()
+                for ans in chat(dia, msg, True, user_id, **req):
                     ans = structure_answer(conv, ans, message_id, conv.id)
                     yield "data:" + json.dumps({"code": 0, "message": "", "data": ans}, ensure_ascii=False) + "\n\n"
                 ConversationService.update_by_id(conv.id, conv.to_dict())
@@ -219,7 +244,8 @@ def completion():
 
         else:
             answer = None
-            for ans in chat(dia, msg, **req):
+            user_id = get_current_user_id()
+            for ans in chat(dia, msg, user_tenant_id=user_id, **req):
                 answer = structure_answer(conv, ans, message_id, conv.id)
                 ConversationService.update_by_id(conv.id, conv.to_dict())
                 break
@@ -345,7 +371,11 @@ def mindmap():
         return get_data_error_result(message="Knowledgebase not found!")
 
     embd_mdl = LLMBundle(kb.tenant_id, LLMType.EMBEDDING, llm_name=kb.embd_id)
-    chat_mdl = LLMBundle(current_user.id, LLMType.CHAT)
+    # Get user's first tenant for chat model
+    user_tenants = TenantService.get_info_by(current_user.id)
+    if not user_tenants:
+        return get_data_error_result(message="User has no associated tenant")
+    chat_mdl = LLMBundle(user_tenants[0]["tenant_id"], LLMType.CHAT)
     question = req["question"]
     ranks = settings.retrievaler.retrieval(question, embd_mdl, kb.tenant_id, kb_ids, 1, 12, 0.3, 0.3, aggs=False, rank_feature=label_question(question, [kb]))
     mindmap = MindMapExtractor(chat_mdl)
@@ -362,7 +392,11 @@ def mindmap():
 def related_questions():
     req = request.json
     question = req["question"]
-    chat_mdl = LLMBundle(current_user.id, LLMType.CHAT)
+    # Get user's first tenant for chat model
+    user_tenants = TenantService.get_info_by(current_user.id)
+    if not user_tenants:
+        return get_data_error_result(message="User has no associated tenant")
+    chat_mdl = LLMBundle(user_tenants[0]["tenant_id"], LLMType.CHAT)
     prompt = """
 Role: You are an AI language model assistant tasked with generating 5-10 related questions based on a user’s original query. These questions should help expand the search query scope and improve search relevance.
 

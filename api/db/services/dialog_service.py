@@ -27,7 +27,7 @@ from peewee import fn
 
 from agentic_reasoning import DeepResearcher
 from api import settings
-from api.db import LLMType, ParserType, StatusEnum
+from api.db import LLMType, ParserType, StatusEnum, TenantPermission
 from api.db.db_models import DB, Dialog
 from api.db.services.common_service import CommonService
 from api.db.services.knowledgebase_service import KnowledgebaseService
@@ -156,17 +156,84 @@ class DialogService(CommonService):
 
         return list(dialogs.dicts()), count
 
+    @classmethod
+    @DB.connection_context()
+    def get_organization_accessible(cls, joined_tenant_ids, user_id, page_number=1, items_per_page=10, orderby="create_time", desc=True):
+        """Get dialogs accessible to a user (personal + organization shared)"""
+        from api.db.db_models import User
+        
+        fields = [
+            cls.model.id,
+            cls.model.tenant_id,
+            cls.model.name,
+            cls.model.description,
+            cls.model.language,
+            cls.model.llm_id,
+            cls.model.llm_setting,
+            cls.model.prompt_type,
+            cls.model.prompt_config,
+            cls.model.similarity_threshold,
+            cls.model.vector_similarity_weight,
+            cls.model.top_n,
+            cls.model.top_k,
+            cls.model.do_refer,
+            cls.model.rerank_id,
+            cls.model.kb_ids,
+            cls.model.permission,
+            cls.model.status,
+            User.nickname,
+            User.avatar.alias("tenant_avatar"),
+            cls.model.update_time,
+            cls.model.create_time,
+        ]
+        
+        # Get dialogs that user can access:
+        # 1. User's own dialogs (created_by == user_id) - regardless of tenant
+        # 2. Organization shared dialogs (permission='team') from joined tenants
+        dialogs = cls.model.select(*fields).join(
+            User, on=(cls.model.tenant_id == User.id)
+        ).where(
+            ((cls.model.created_by == user_id) |
+             (cls.model.tenant_id.in_(joined_tenant_ids) & (cls.model.permission == TenantPermission.TEAM.value)))
+            & (cls.model.status == StatusEnum.VALID.value)
+        )
+        
+        if desc:
+            dialogs = dialogs.order_by(cls.model.getter_by(orderby).desc())
+        else:
+            dialogs = dialogs.order_by(cls.model.getter_by(orderby).asc())
+        
+        count = dialogs.count()
+        
+        if page_number and items_per_page:
+            dialogs = dialogs.paginate(page_number, items_per_page)
+        
+        return list(dialogs.dicts()), count
 
-def chat_solo(dialog, messages, stream=True):
+
+def chat_solo(dialog, messages, stream=True, user_tenant_id=None):
+    from api.db.services.llm_service import LLMBundleForAssistant
+    
+    # Validate dialog object
+    if not dialog:
+        raise ValueError("Dialog object is None")
+    if not hasattr(dialog, 'tenant_id'):
+        raise ValueError("Dialog object missing tenant_id attribute")
+    
+    # Use user's tenant ID if provided, otherwise use dialog's tenant ID
+    actual_user_tenant = user_tenant_id if user_tenant_id else dialog.tenant_id
+    # Use created_by if available (for new dialogs), otherwise fallback to tenant_id (for old dialogs)
+    creator_tenant = getattr(dialog, 'created_by', None) or getattr(dialog, 'tenant_id', None)
+    
     if TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text":
-        chat_mdl = LLMBundle(dialog.tenant_id, LLMType.IMAGE2TEXT, dialog.llm_id)
+        chat_mdl = LLMBundleForAssistant(actual_user_tenant, LLMType.IMAGE2TEXT, dialog.llm_id, creator_tenant)
     else:
-        chat_mdl = LLMBundle(dialog.tenant_id, LLMType.CHAT, dialog.llm_id)
+        chat_mdl = LLMBundleForAssistant(actual_user_tenant, LLMType.CHAT, dialog.llm_id, creator_tenant)
 
     prompt_config = dialog.prompt_config
     tts_mdl = None
     if prompt_config.get("tts"):
-        tts_mdl = LLMBundle(dialog.tenant_id, LLMType.TTS)
+        tts_mdl = LLMBundleForAssistant(actual_user_tenant, LLMType.TTS, creator_tenant_id=creator_tenant)
     msg = [{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"]
     if stream:
         last_ans = ""
@@ -188,28 +255,41 @@ def chat_solo(dialog, messages, stream=True):
         yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
 
 
-def get_models(dialog):
+def get_models(dialog, user_tenant_id=None):
+    from api.db.services.llm_service import LLMBundleForAssistant
+    
+    # Validate dialog object
+    if not dialog:
+        raise ValueError("Dialog object is None")
+    if not hasattr(dialog, 'tenant_id'):
+        raise ValueError("Dialog object missing tenant_id attribute")
+    
     embd_mdl, chat_mdl, rerank_mdl, tts_mdl = None, None, None, None
     kbs = KnowledgebaseService.get_by_ids(dialog.kb_ids)
     embedding_list = list(set([kb.embd_id for kb in kbs]))
     if len(embedding_list) > 1:
         raise Exception("**ERROR**: Knowledge bases use different embedding models.")
 
+    # Use user's tenant ID if provided, otherwise use dialog's tenant ID
+    actual_user_tenant = user_tenant_id if user_tenant_id else dialog.tenant_id
+    # Use created_by if available (for new dialogs), otherwise fallback to tenant_id (for old dialogs)
+    creator_tenant = getattr(dialog, 'created_by', None) or getattr(dialog, 'tenant_id', None)
+
     if embedding_list:
-        embd_mdl = LLMBundle(dialog.tenant_id, LLMType.EMBEDDING, embedding_list[0])
+        embd_mdl = LLMBundleForAssistant(actual_user_tenant, LLMType.EMBEDDING, embedding_list[0], creator_tenant)
         if not embd_mdl:
             raise LookupError("Embedding model(%s) not found" % embedding_list[0])
 
     if TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text":
-        chat_mdl = LLMBundle(dialog.tenant_id, LLMType.IMAGE2TEXT, dialog.llm_id)
+        chat_mdl = LLMBundleForAssistant(actual_user_tenant, LLMType.IMAGE2TEXT, dialog.llm_id, creator_tenant)
     else:
-        chat_mdl = LLMBundle(dialog.tenant_id, LLMType.CHAT, dialog.llm_id)
+        chat_mdl = LLMBundleForAssistant(actual_user_tenant, LLMType.CHAT, dialog.llm_id, creator_tenant)
 
     if dialog.rerank_id:
-        rerank_mdl = LLMBundle(dialog.tenant_id, LLMType.RERANK, dialog.rerank_id)
+        rerank_mdl = LLMBundleForAssistant(actual_user_tenant, LLMType.RERANK, dialog.rerank_id, creator_tenant)
 
     if dialog.prompt_config.get("tts"):
-        tts_mdl = LLMBundle(dialog.tenant_id, LLMType.TTS)
+        tts_mdl = LLMBundleForAssistant(actual_user_tenant, LLMType.TTS, creator_tenant_id=creator_tenant)
     return kbs, embd_mdl, rerank_mdl, chat_mdl, tts_mdl
 
 
@@ -250,10 +330,15 @@ def repair_bad_citation_formats(answer: str, kbinfos: dict, idx: set):
     return answer, idx
 
 
-def chat(dialog, messages, stream=True, **kwargs):
+def chat(dialog, messages, stream=True, user_tenant_id=None, **kwargs):
     assert messages[-1]["role"] == "user", "The last content of this conversation is not from user."
+    
+    # Validate dialog object
+    if not dialog:
+        raise ValueError("Dialog object is None in chat function")
+    
     if not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key"):
-        for ans in chat_solo(dialog, messages, stream):
+        for ans in chat_solo(dialog, messages, stream, user_tenant_id):
             yield ans
         return
 
@@ -279,7 +364,7 @@ def chat(dialog, messages, stream=True, **kwargs):
             trace_context = {"trace_id": trace_id}
 
     check_langfuse_tracer_ts = timer()
-    kbs, embd_mdl, rerank_mdl, chat_mdl, tts_mdl = get_models(dialog)
+    kbs, embd_mdl, rerank_mdl, chat_mdl, tts_mdl = get_models(dialog, user_tenant_id)
     toolcall_session, tools = kwargs.get("toolcall_session"), kwargs.get("tools")
     if toolcall_session and tools:
         chat_mdl.bind_tools(toolcall_session, tools)

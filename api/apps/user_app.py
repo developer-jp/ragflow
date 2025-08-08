@@ -594,8 +594,8 @@ def user_register(user_id, user):
     user["id"] = user_id
     tenant = {
         "id": user_id,
-        "name": user["nickname"] + "‘s Kingdom",
-        "llm_id": settings.CHAT_MDL,
+        "name": user["nickname"] + "'s Kingdom",
+        "llm_id": "gemma3-optimized",  # toB 版本默认使用本地 Ollama 模型
         "embd_id": settings.EMBEDDING_MDL,
         "asr_id": settings.ASR_MDL,
         "parser_ids": settings.PARSERS,
@@ -632,6 +632,30 @@ def user_register(user_id, user):
                 "max_tokens": llm.max_tokens if llm.max_tokens else 8192,
             }
         )
+    
+    # 为 toB 版本添加默认的 Ollama 配置，让用户开箱即用
+    default_ollama_config = {
+        "tenant_id": user_id,
+        "llm_factory": "Ollama", 
+        "llm_name": "gemma3-optimized",
+        "model_type": "chat",
+        "api_key": "sk-dummy",
+        "api_base": "http://172.18.0.1:11434",
+        "max_tokens": 16384
+    }
+    tenant_llm.append(default_ollama_config)
+    
+    # 添加大上下文版本
+    large_ollama_config = {
+        "tenant_id": user_id,
+        "llm_factory": "Ollama", 
+        "llm_name": "gemma3-optimized-large",
+        "model_type": "chat",
+        "api_key": "sk-dummy",
+        "api_base": "http://172.18.0.1:11434",
+        "max_tokens": 16384
+    }
+    tenant_llm.append(large_ollama_config)
     if settings.LIGHTEN != 1:
         for buildin_embedding_model in settings.BUILTIN_EMBEDDING_MODELS:
             mdlnm, fid = TenantLLMService.split_model_name_and_factory(buildin_embedding_model)

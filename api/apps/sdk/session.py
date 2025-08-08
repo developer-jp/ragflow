@@ -304,7 +304,7 @@ def chat_completion_openai_like(tenant_id, chat_id):
             }
 
             try:
-                for ans in chat(dia, msg, True, toolcall_session=toolcall_session, tools=tools, quote=need_reference):
+                for ans in chat(dia, msg, True, tenant_id, toolcall_session=toolcall_session, tools=tools, quote=need_reference):
                     last_ans = ans
                     answer = ans["answer"]
 
@@ -371,7 +371,7 @@ def chat_completion_openai_like(tenant_id, chat_id):
         return resp
     else:
         answer = None
-        for ans in chat(dia, msg, False, toolcall_session=toolcall_session, tools=tools, quote=need_reference):
+        for ans in chat(dia, msg, False, tenant_id, toolcall_session=toolcall_session, tools=tools, quote=need_reference):
             # focus answer content only
             answer = ans
             break

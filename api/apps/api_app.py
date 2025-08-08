@@ -311,7 +311,7 @@ def completion():
         def stream():
             nonlocal dia, msg, req, conv
             try:
-                for ans in chat(dia, msg, True, **req):
+                for ans in chat(dia, msg, True, objs[0].tenant_id, **req):
                     fillin_conv(ans)
                     rename_field(ans)
                     yield "data:" + json.dumps({"code": 0, "message": "", "data": ans},
@@ -332,7 +332,7 @@ def completion():
             return resp
 
         answer = None
-        for ans in chat(dia, msg, **req):
+        for ans in chat(dia, msg, user_tenant_id=objs[0].tenant_id, **req):
             answer = ans
             fillin_conv(ans)
             API4ConversationService.append_message(conv.id, conv.to_dict())
@@ -823,7 +823,7 @@ def completion_faq():
             }
         ]
         ans = ""
-        for a in chat(dia, msg, stream=False, **req):
+        for a in chat(dia, msg, stream=False, user_tenant_id=objs[0].tenant_id, **req):
             ans = a
             break
         data[0]["content"] += re.sub(r'##\d\$\$', '', ans["answer"])

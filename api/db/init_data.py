@@ -50,8 +50,8 @@ def init_superuser():
     }
     tenant = {
         "id": user_info["id"],
-        "name": user_info["nickname"] + "‘s Kingdom",
-        "llm_id": settings.CHAT_MDL,
+        "name": user_info["nickname"] + "'s Kingdom",
+        "llm_id": "gemma3-optimized",  # 默认使用本地 Ollama 模型
         "embd_id": settings.EMBEDDING_MDL,
         "asr_id": settings.ASR_MDL,
         "parser_ids": settings.PARSERS,
@@ -69,6 +69,30 @@ def init_superuser():
             {"tenant_id": user_info["id"], "llm_factory": settings.LLM_FACTORY, "llm_name": llm.llm_name,
              "model_type": llm.model_type,
              "api_key": settings.API_KEY, "api_base": settings.LLM_BASE_URL})
+
+    # 为 toB 版本添加默认的 Ollama 配置，让用户开箱即用
+    default_ollama_config = {
+        "tenant_id": user_info["id"],
+        "llm_factory": "Ollama", 
+        "llm_name": "gemma3-optimized",
+        "model_type": "chat",
+        "api_key": "sk-dummy",
+        "api_base": "http://172.18.0.1:11434",
+        "max_tokens": 16384
+    }
+    tenant_llm.append(default_ollama_config)
+    
+    # 添加大上下文版本
+    large_ollama_config = {
+        "tenant_id": user_info["id"],
+        "llm_factory": "Ollama", 
+        "llm_name": "gemma3-optimized-large",
+        "model_type": "chat",
+        "api_key": "sk-dummy",
+        "api_base": "http://172.18.0.1:11434",
+        "max_tokens": 16384
+    }
+    tenant_llm.append(large_ollama_config)
 
     if not UserService.save(**user_info):
         logging.error("can't init admin.")

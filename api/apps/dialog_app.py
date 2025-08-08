@@ -17,7 +17,7 @@
 from flask import request
 from flask_login import login_required, current_user
 from api.db.services.dialog_service import DialogService
-from api.db import StatusEnum
+from api.db import StatusEnum, UserTenantRole
 from api.db.services.llm_service import TenantLLMService
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.user_service import TenantService, UserTenantService
@@ -75,7 +75,22 @@ def set_dialog():
             return get_data_error_result(message=f'Datasets use different embedding models: {[kb.embd_id for kb in kbs]}"')
 
         llm_id = req.get("llm_id", tenant.llm_id)
+        
+        # Get user role in tenant to determine default permission
+        user_tenants = UserTenantService.query(
+            user_id=current_user.id, 
+            tenant_id=current_user.id
+        )
+        user_role = user_tenants[0].role if user_tenants else UserTenantRole.NORMAL
+        
         if not dialog_id:
+            # Set permission based on user role
+            # Managers/Owners create dialogs shared with organization by default
+            if user_role in [UserTenantRole.OWNER, UserTenantRole.ADMIN]:
+                permission = req.get("permission", "team")  # Default to team sharing
+            else:
+                permission = "me"  # Normal members can only create personal dialogs
+            
             dia = {
                 "id": get_uuid(),
                 "tenant_id": current_user.id,
@@ -90,7 +105,9 @@ def set_dialog():
                 "rerank_id": rerank_id,
                 "similarity_threshold": similarity_threshold,
                 "vector_similarity_weight": vector_similarity_weight,
-                "icon": icon
+                "icon": icon,
+                "permission": permission,
+                "created_by": current_user.id
             }
             if not DialogService.save(**dia):
                 return get_data_error_result(message="Fail to new a dialog!")
@@ -142,14 +159,17 @@ def get_kb_names(kb_ids):
 @login_required
 def list_dialogs():
     try:
-        diags = DialogService.query(
-            tenant_id=current_user.id,
-            status=StatusEnum.VALID.value,
-            reverse=True,
-            order_by=DialogService.model.create_time)
-        diags = [d.to_dict() for d in diags]
+        # Get all tenants the user belongs to (including their own)
+        tenants = TenantService.get_joined_tenants_by_user_id(current_user.id)
+        tenant_ids = [t["tenant_id"] for t in tenants]
+        
+        # Get dialogs accessible to the user (personal + organization shared)
+        diags, _ = DialogService.get_organization_accessible(
+            tenant_ids, current_user.id, page_number=0, items_per_page=0
+        )
+        
         for d in diags:
-            d["kb_ids"], d["kb_names"] = get_kb_names(d["kb_ids"])
+            d["kb_ids"], d["kb_names"] = get_kb_names(d.get("kb_ids", []))
         return get_json_result(data=diags)
     except Exception as e:
         return server_error_response(e)
@@ -172,12 +192,17 @@ def list_dialogs_next():
     owner_ids = req.get("owner_ids", [])
     try:
         if not owner_ids:
-            # tenants = TenantService.get_joined_tenants_by_user_id(current_user.id)
-            # tenants = [tenant["tenant_id"] for tenant in tenants]
-            tenants = [] # keep it here
-            dialogs, total = DialogService.get_by_tenant_ids(
-                tenants, current_user.id, page_number,
-                items_per_page, orderby, desc, keywords, parser_id)
+            # Get all tenants the user belongs to (including their own)
+            tenant_data = TenantService.get_joined_tenants_by_user_id(current_user.id)
+            tenants = [tenant["tenant_id"] for tenant in tenant_data]
+            
+            # Use organization-accessible method for shared dialogs
+            dialogs, total = DialogService.get_organization_accessible(
+                tenants, current_user.id, page_number, items_per_page, orderby, desc)
+            
+            # Add knowledge base names
+            for d in dialogs:
+                d["kb_ids"], d["kb_names"] = get_kb_names(d.get("kb_ids", []))
         else:
             tenants = owner_ids
             dialogs, total = DialogService.get_by_tenant_ids(
@@ -198,13 +223,18 @@ def list_dialogs_next():
 def rm():
     req = request.json
     dialog_list=[]
-    tenants = UserTenantService.query(user_id=current_user.id)
+    # Get all tenants the user belongs to
+    tenant_data = TenantService.get_joined_tenants_by_user_id(current_user.id)
+    tenant_ids = [t["tenant_id"] for t in tenant_data]
+    
+    # Get all dialogs accessible to the user
+    accessible_dialogs, _ = DialogService.get_organization_accessible(tenant_ids, current_user.id, 0, 0)
+    accessible_dialog_ids = {d['id'] for d in accessible_dialogs}
+    
     try:
         for id in req["dialog_ids"]:
-            for tenant in tenants:
-                if DialogService.query(tenant_id=tenant.tenant_id, id=id):
-                    break
-            else:
+            # Check if user has access to this dialog (owner or team member)
+            if id not in accessible_dialog_ids:
                 return get_json_result(
                     data=False, message='Only owner of dialog authorized for this operation.',
                     code=settings.RetCode.OPERATING_ERROR)

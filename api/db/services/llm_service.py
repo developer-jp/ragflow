@@ -44,6 +44,8 @@ class TenantLLMService(CommonService):
     @DB.connection_context()
     def get_api_key(cls, tenant_id, model_name):
         mdlnm, fid = TenantLLMService.split_model_name_and_factory(model_name)
+        
+        # First try to find in user's own tenant
         if not fid:
             objs = cls.query(tenant_id=tenant_id, llm_name=mdlnm)
         else:
@@ -58,6 +60,8 @@ class TenantLLMService(CommonService):
                 mdlnm += "___OpenAI-API"
             elif fid == "VLLM":
                 mdlnm += "___VLLM"
+            
+            # Try with modified name in user's tenant
             objs = cls.query(tenant_id=tenant_id, llm_name=mdlnm, llm_factory=fid)
         if not objs:
             return
@@ -66,10 +70,38 @@ class TenantLLMService(CommonService):
     @classmethod
     @DB.connection_context()
     def get_my_llms(cls, tenant_id):
+        # Only show user's own models
         fields = [cls.model.llm_factory, LLMFactories.logo, LLMFactories.tags, cls.model.model_type, cls.model.llm_name, cls.model.used_tokens]
-        objs = cls.model.select(*fields).join(LLMFactories, on=(cls.model.llm_factory == LLMFactories.name)).where(cls.model.tenant_id == tenant_id, ~cls.model.api_key.is_null()).dicts()
+        
+        objs = cls.model.select(*fields).join(
+            LLMFactories, on=(cls.model.llm_factory == LLMFactories.name)
+        ).where(
+            cls.model.tenant_id == tenant_id, 
+            ~cls.model.api_key.is_null()
+        ).dicts()
 
         return list(objs)
+
+    @classmethod
+    @DB.connection_context()
+    def get_api_key_for_assistant(cls, user_tenant_id, model_name, creator_tenant_id=None):
+        """
+        Get model configuration for assistant usage:
+        1. First try user's own configuration
+        2. If not found and creator_tenant_id provided, use creator's configuration
+        """
+        # Try user's own configuration first
+        user_config = cls.get_api_key(user_tenant_id, model_name)
+        if user_config:
+            return user_config
+            
+        # If user doesn't have the model and creator_tenant_id is provided, use creator's config
+        if creator_tenant_id and creator_tenant_id != user_tenant_id:
+            creator_config = cls.get_api_key(creator_tenant_id, model_name)
+            if creator_config:
+                return creator_config
+        
+        return None
 
     @staticmethod
     def split_model_name_and_factory(model_name):
@@ -139,6 +171,27 @@ class TenantLLMService(CommonService):
 
     @classmethod
     @DB.connection_context()
+    def get_model_config_for_assistant(cls, user_tenant_id, llm_type, llm_name=None, creator_tenant_id=None):
+        """
+        Get model configuration for assistant usage:
+        1. First try user's own configuration
+        2. If not found and creator_tenant_id provided, use creator's configuration
+        """
+        try:
+            # Try user's own configuration first
+            return cls.get_model_config(user_tenant_id, llm_type, llm_name)
+        except LookupError:
+            # If user doesn't have the model and creator_tenant_id is provided, use creator's config
+            if creator_tenant_id and creator_tenant_id != user_tenant_id:
+                try:
+                    return cls.get_model_config(creator_tenant_id, llm_type, llm_name)
+                except LookupError:
+                    pass
+            # Re-raise the original exception
+            raise
+
+    @classmethod
+    @DB.connection_context()
     def model_instance(cls, tenant_id, llm_type, llm_name=None, lang="Chinese", **kwargs):
         model_config = TenantLLMService.get_model_config(tenant_id, llm_type, llm_name)
         if llm_type == LLMType.EMBEDDING.value:
@@ -176,10 +229,52 @@ class TenantLLMService(CommonService):
 
     @classmethod
     @DB.connection_context()
+    def model_instance_for_assistant(cls, user_tenant_id, llm_type, llm_name=None, creator_tenant_id=None, lang="Chinese", **kwargs):
+        """Create model instance for assistant usage, with fallback to creator's config"""
+        model_config = TenantLLMService.get_model_config_for_assistant(user_tenant_id, llm_type, llm_name, creator_tenant_id)
+        if llm_type == LLMType.EMBEDDING.value:
+            if model_config["llm_factory"] not in EmbeddingModel:
+                return
+            return EmbeddingModel[model_config["llm_factory"]](model_config["api_key"], model_config["llm_name"], base_url=model_config["api_base"])
+
+        if llm_type == LLMType.RERANK:
+            if model_config["llm_factory"] not in RerankModel:
+                return
+            return RerankModel[model_config["llm_factory"]](model_config["api_key"], model_config["llm_name"], base_url=model_config["api_base"])
+
+        if llm_type == LLMType.IMAGE2TEXT.value:
+            if model_config["llm_factory"] not in CvModel:
+                return
+            return CvModel[model_config["llm_factory"]](model_config["api_key"], model_config["llm_name"], lang, base_url=model_config["api_base"], **kwargs)
+
+        if llm_type == LLMType.CHAT.value:
+            if model_config["llm_factory"] not in ChatModel:
+                return
+            return ChatModel[model_config["llm_factory"]](model_config["api_key"], model_config["llm_name"], base_url=model_config["api_base"], **kwargs)
+
+        if llm_type == LLMType.SPEECH2TEXT:
+            if model_config["llm_factory"] not in Seq2txtModel:
+                return
+            return Seq2txtModel[model_config["llm_factory"]](key=model_config["api_key"], model_name=model_config["llm_name"], lang=lang, base_url=model_config["api_base"])
+        if llm_type == LLMType.TTS:
+            if model_config["llm_factory"] not in TTSModel:
+                return
+            return TTSModel[model_config["llm_factory"]](
+                model_config["api_key"],
+                model_config["llm_name"],
+                base_url=model_config["api_base"],
+            )
+
+    @classmethod
+    @DB.connection_context()
     def increase_usage(cls, tenant_id, llm_type, used_tokens, llm_name=None):
-        e, tenant = TenantService.get_by_id(tenant_id)
-        if not e:
-            logging.error(f"Tenant not found: {tenant_id}")
+        try:
+            e, tenant = TenantService.get_by_id(tenant_id)
+            if not e:
+                logging.error(f"Tenant not found: {tenant_id}")
+                return 0
+        except Exception as ex:
+            logging.error(f"Error querying tenant {tenant_id}: {ex}")
             return 0
 
         llm_map = {
@@ -243,6 +338,40 @@ class LLMBundle:
         self.verbose_tool_use = kwargs.get("verbose_tool_use")
 
         langfuse_keys = TenantLangfuseService.filter_by_tenant(tenant_id=tenant_id)
+        self.langfuse = None
+        if langfuse_keys:
+            langfuse = Langfuse(public_key=langfuse_keys.public_key, secret_key=langfuse_keys.secret_key, host=langfuse_keys.host)
+            if langfuse.auth_check():
+                self.langfuse = langfuse
+                trace_id = self.langfuse.create_trace_id()
+                self.trace_context = {"trace_id": trace_id}
+
+
+class LLMBundleForAssistant(LLMBundle):
+    """LLMBundle for assistant usage with fallback to creator's model configuration"""
+    def __init__(self, user_tenant_id, llm_type, llm_name=None, creator_tenant_id=None, lang="Chinese", **kwargs):
+        if not user_tenant_id:
+            raise ValueError("user_tenant_id cannot be None")
+        
+        self.user_tenant_id = user_tenant_id
+        self.creator_tenant_id = creator_tenant_id
+        self.tenant_id = user_tenant_id  # For compatibility with parent class
+        self.llm_type = llm_type
+        self.llm_name = llm_name
+        self.mdl = TenantLLMService.model_instance_for_assistant(user_tenant_id, llm_type, llm_name, creator_tenant_id, lang=lang, **kwargs)
+        if not self.mdl:
+            raise RuntimeError(f"Can't find model for user={user_tenant_id}, creator={creator_tenant_id}, type={llm_type}, name={llm_name}")
+        
+        model_config = TenantLLMService.get_model_config_for_assistant(user_tenant_id, llm_type, llm_name, creator_tenant_id)
+        if not model_config:
+            raise RuntimeError(f"Can't get model config for user={user_tenant_id}, creator={creator_tenant_id}, type={llm_type}, name={llm_name}")
+        
+        self.max_length = model_config.get("max_tokens", 8192)
+        self.is_tools = model_config.get("is_tools", False)
+        self.verbose_tool_use = kwargs.get("verbose_tool_use")
+
+        # Use user's tenant for langfuse tracking
+        langfuse_keys = TenantLangfuseService.filter_by_tenant(tenant_id=user_tenant_id)
         self.langfuse = None
         if langfuse_keys:
             langfuse = Langfuse(public_key=langfuse_keys.public_key, secret_key=langfuse_keys.secret_key, host=langfuse_keys.host)

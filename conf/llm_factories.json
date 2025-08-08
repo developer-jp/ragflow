@@ -582,7 +582,22 @@
             "logo": "",
             "tags": "LLM,TEXT EMBEDDING,SPEECH2TEXT,MODERATION",
             "status": "1",
-            "llm": []
+            "llm": [
+                {
+                    "llm_name": "gemma3-optimized",
+                    "tags": "LLM,CHAT,16K",
+                    "max_tokens": 16384,
+                    "model_type": "chat",
+                    "is_tools": false
+                },
+                {
+                    "llm_name": "gemma3-optimized-large",
+                    "tags": "LLM,CHAT,16K",
+                    "max_tokens": 16384,
+                    "model_type": "chat",
+                    "is_tools": false
+                }
+            ]
         },
         {
             "name": "ModelScope",
