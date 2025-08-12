@@ -350,7 +350,7 @@ def generate_confirmation_token(tenant_id):
 
 def get_parser_config(chunk_method, parser_config):
     if not chunk_method:
-        chunk_method = "naive"
+        chunk_method = "manual"
 
     # Define default configurations for each chunk method
     key_mapping = {

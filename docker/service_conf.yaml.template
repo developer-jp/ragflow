@@ -71,7 +71,7 @@ redis:
 #   base_url: ''
 #   default_models:
 #     chat_model: 'qwen-plus'
-#     embedding_model: 'BAAI/bge-large-zh-v1.5@BAAI'
+#     embedding_model: 'Alibaba-NLP/gte-multilingual-base@BAAI'
 #     rerank_model: ''
 #     asr_model: ''
 #     image2text_model: ''

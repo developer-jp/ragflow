@@ -893,9 +893,9 @@
             "status": "1",
             "llm": [
                 {
-                    "llm_name": "BAAI/bge-large-zh-v1.5",
+                    "llm_name": "Alibaba-NLP/gte-multilingual-base",
                     "tags": "TEXT EMBEDDING,",
-                    "max_tokens": 1024,
+                    "max_tokens": 512,
                     "model_type": "embedding"
                 }
             ]

@@ -639,7 +639,7 @@ class Knowledgebase(DataBaseModel):
     language = CharField(max_length=32, null=True, default="Chinese" if "zh_CN" in os.getenv("LANG", "") else "English", help_text="English|Chinese", index=True)
     description = TextField(null=True, help_text="KB description")
     embd_id = CharField(max_length=128, null=False, help_text="default embedding model ID", index=True)
-    permission = CharField(max_length=16, null=False, help_text="me|team", default="me", index=True)
+    permission = CharField(max_length=16, null=False, help_text="me|team", default="team", index=True)
     created_by = CharField(max_length=32, null=False, index=True)
     doc_num = IntegerField(default=0, index=True)
     token_num = IntegerField(default=0, index=True)
@@ -647,7 +647,7 @@ class Knowledgebase(DataBaseModel):
     similarity_threshold = FloatField(default=0.2, index=True)
     vector_similarity_weight = FloatField(default=0.3, index=True)
 
-    parser_id = CharField(max_length=32, null=False, help_text="default parser ID", default=ParserType.NAIVE.value, index=True)
+    parser_id = CharField(max_length=32, null=False, help_text="default parser ID", default=ParserType.MANUAL.value, index=True)
     parser_config = JSONField(null=False, default={"pages": [[1, 1000000]]})
     pagerank = IntegerField(default=0, index=False)
     status = CharField(max_length=1, null=True, help_text="is it validate(0: wasted, 1: validate)", default="1", index=True)
@@ -757,7 +757,7 @@ class Dialog(DataBaseModel):
     rerank_id = CharField(max_length=128, null=False, help_text="default rerank model ID")
 
     kb_ids = JSONField(null=False, default=[])
-    permission = CharField(max_length=16, null=False, help_text="me|team", default="me", index=True)
+    permission = CharField(max_length=16, null=False, help_text="me|team", default="team", index=True)
     created_by = CharField(max_length=32, null=True, help_text="who created this dialog", index=True)
     status = CharField(max_length=1, null=True, help_text="is it validate(0: wasted, 1: validate)", default="1", index=True)
 
@@ -813,7 +813,7 @@ class UserCanvas(DataBaseModel):
     user_id = CharField(max_length=255, null=False, help_text="user_id", index=True)
     title = CharField(max_length=255, null=True, help_text="Canvas title")
 
-    permission = CharField(max_length=16, null=False, help_text="me|team", default="me", index=True)
+    permission = CharField(max_length=16, null=False, help_text="me|team", default="team", index=True)
     description = TextField(null=True, help_text="Canvas description")
     canvas_type = CharField(max_length=32, null=True, help_text="Canvas type", index=True)
     dsl = JSONField(null=True, default={})
@@ -990,7 +990,7 @@ def migrate_db():
     except Exception:
         pass
     try:
-        migrate(migrator.add_column("user_canvas", "permission", CharField(max_length=16, null=False, help_text="me|team", default="me", index=True)))
+        migrate(migrator.add_column("user_canvas", "permission", CharField(max_length=16, null=False, help_text="me|team", default="team", index=True)))
     except Exception:
         pass
     try:

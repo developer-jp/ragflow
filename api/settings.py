@@ -72,7 +72,7 @@ SANDBOX_ENABLED = 0
 SANDBOX_HOST = None
 STRONG_TEST_COUNT = int(os.environ.get("STRONG_TEST_COUNT", "32"))
 
-BUILTIN_EMBEDDING_MODELS = ["BAAI/bge-large-zh-v1.5@BAAI", "maidalun1020/bce-embedding-base_v1@Youdao"]
+BUILTIN_EMBEDDING_MODELS = ["Alibaba-NLP/gte-multilingual-base@BAAI", "maidalun1020/bce-embedding-base_v1@Youdao"]
 
 def get_or_create_secret_key():
     secret_key = os.environ.get("RAGFLOW_SECRET_KEY")
