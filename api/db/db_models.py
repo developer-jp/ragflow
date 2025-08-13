@@ -506,7 +506,7 @@ class User(DataBaseModel, UserMixin):
     avatar = TextField(null=True, help_text="avatar base64 string")
     language = CharField(max_length=32, null=True, help_text="English|Chinese", default="Chinese" if "zh_CN" in os.getenv("LANG", "") else "English", index=True)
     color_schema = CharField(max_length=32, null=True, help_text="Bright|Dark", default="Bright", index=True)
-    timezone = CharField(max_length=64, null=True, help_text="Timezone", default="UTC+8\tAsia/Shanghai", index=True)
+    timezone = CharField(max_length=64, null=True, help_text="Timezone", default="UTC+9\tAsia/Tokyo", index=True)
     last_login_time = DateTimeField(null=True, index=True)
     is_authenticated = CharField(max_length=1, null=False, default="1", index=True)
     is_active = CharField(max_length=1, null=False, default="1", index=True)
