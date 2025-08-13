@@ -81,6 +81,13 @@ class DefaultEmbedding(Base):
         ^_-
 
         """
+        # Set environment variable to allow trust_remote_code for Alibaba-NLP models
+        if "Alibaba-NLP" in model_name:
+            os.environ["TRUST_REMOTE_CODE"] = "True"
+            os.environ["HF_HUB_DISABLE_EXPERIMENTAL_WARNING"] = "1"
+            # Force CPU usage due to RTX 5090 CUDA incompatibility
+            os.environ["CUDA_VISIBLE_DEVICES"] = ""
+        
         if not settings.LIGHTEN:
             input_cuda_visible_devices = None
             with DefaultEmbedding._model_lock:
@@ -88,24 +95,96 @@ class DefaultEmbedding(Base):
                 from FlagEmbedding import FlagModel
                 if "CUDA_VISIBLE_DEVICES" in os.environ:
                     input_cuda_visible_devices = os.environ["CUDA_VISIBLE_DEVICES"]
-                    os.environ["CUDA_VISIBLE_DEVICES"] = "0" # handle some issues with multiple GPUs when initializing the model
+                    # For Alibaba-NLP models, keep CPU-only setting due to RTX 5090 compatibility issues
+                    if "Alibaba-NLP" not in model_name:
+                        os.environ["CUDA_VISIBLE_DEVICES"] = "0" # handle some issues with multiple GPUs when initializing the model
 
                 if not DefaultEmbedding._model or model_name != DefaultEmbedding._model_name:
                     try:
-                        DefaultEmbedding._model = FlagModel(
-                            os.path.join(get_home_cache_dir(), re.sub(r"^[a-zA-Z0-9]+/", "", model_name)),
-                            query_instruction_for_retrieval="为这个句子生成表示以用于检索相关文章：",
-                            use_fp16=torch.cuda.is_available(),
-                        )
+                        # Create custom FlagModel with trust_remote_code=True support
+                        model_path = os.path.join(get_home_cache_dir(), re.sub(r"^[a-zA-Z0-9]+/", "", model_name))
+                        
+                        # Monkey-patch AutoModel to always use trust_remote_code=True for this model
+                        import transformers
+                        from transformers import AutoModel, AutoTokenizer
+                        
+                        # Store original methods
+                        original_model_from_pretrained = AutoModel.from_pretrained
+                        original_tokenizer_from_pretrained = AutoTokenizer.from_pretrained
+                        
+                        # Define wrappers that add trust_remote_code=True
+                        def model_from_pretrained_with_trust(*args, **kwargs):
+                            kwargs['trust_remote_code'] = True
+                            return original_model_from_pretrained(*args, **kwargs)
+                        
+                        def tokenizer_from_pretrained_with_trust(*args, **kwargs):
+                            kwargs['trust_remote_code'] = True
+                            return original_tokenizer_from_pretrained(*args, **kwargs)
+                        
+                        # Replace the methods
+                        AutoModel.from_pretrained = model_from_pretrained_with_trust
+                        AutoTokenizer.from_pretrained = tokenizer_from_pretrained_with_trust
+                        
+                        try:
+                            # Force CPU usage for Alibaba-NLP models due to RTX 5090 CUDA incompatibility
+                            if "Alibaba-NLP" in model_name:
+                                import torch
+                                torch.cuda.set_device = lambda x: None  # Disable CUDA device setting
+                            DefaultEmbedding._model = FlagModel(
+                                model_path,
+                                query_instruction_for_retrieval="为这个句子生成表示以用于检索相关文章：",
+                                use_fp16=False,  # Force CPU due to RTX 5090 CUDA incompatibility
+                            )
+                            # Explicitly move model to CPU for Alibaba-NLP models
+                            if "Alibaba-NLP" in model_name and hasattr(DefaultEmbedding._model, 'model'):
+                                DefaultEmbedding._model.model = DefaultEmbedding._model.model.cpu()
+                        finally:
+                            # Restore original methods
+                            AutoModel.from_pretrained = original_model_from_pretrained
+                            AutoTokenizer.from_pretrained = original_tokenizer_from_pretrained
                         DefaultEmbedding._model_name = model_name
                     except Exception:
                         model_dir = snapshot_download(
                             repo_id="Alibaba-NLP/gte-multilingual-base", local_dir=os.path.join(get_home_cache_dir(), re.sub(r"^[a-zA-Z0-9]+/", "", model_name)), local_dir_use_symlinks=False
                         )
-                        DefaultEmbedding._model = FlagModel(model_dir, query_instruction_for_retrieval="为这个句子生成表示以用于检索相关文章：", use_fp16=torch.cuda.is_available())
+                        
+                        # Apply trust_remote_code patch for fallback path too
+                        import transformers
+                        from transformers import AutoModel, AutoTokenizer
+                        
+                        # Store original methods
+                        original_model_from_pretrained = AutoModel.from_pretrained
+                        original_tokenizer_from_pretrained = AutoTokenizer.from_pretrained
+                        
+                        # Define wrappers that add trust_remote_code=True
+                        def model_from_pretrained_with_trust(*args, **kwargs):
+                            kwargs['trust_remote_code'] = True
+                            return original_model_from_pretrained(*args, **kwargs)
+                        
+                        def tokenizer_from_pretrained_with_trust(*args, **kwargs):
+                            kwargs['trust_remote_code'] = True
+                            return original_tokenizer_from_pretrained(*args, **kwargs)
+                        
+                        # Replace the methods
+                        AutoModel.from_pretrained = model_from_pretrained_with_trust
+                        AutoTokenizer.from_pretrained = tokenizer_from_pretrained_with_trust
+                        
+                        try:
+                            # Force CPU usage for Alibaba-NLP models due to RTX 5090 CUDA incompatibility
+                            if "Alibaba-NLP" in model_name:
+                                import torch
+                                torch.cuda.set_device = lambda x: None  # Disable CUDA device setting
+                            DefaultEmbedding._model = FlagModel(model_dir, query_instruction_for_retrieval="为这个句子生成表示以用于检索相关文章：", use_fp16=False)  # Force CPU due to RTX 5090 CUDA incompatibility
+                            # Explicitly move model to CPU for Alibaba-NLP models
+                            if "Alibaba-NLP" in model_name and hasattr(DefaultEmbedding._model, 'model'):
+                                DefaultEmbedding._model.model = DefaultEmbedding._model.model.cpu()
+                        finally:
+                            # Restore original methods
+                            AutoModel.from_pretrained = original_model_from_pretrained
+                            AutoTokenizer.from_pretrained = original_tokenizer_from_pretrained
                     finally:
-                        if input_cuda_visible_devices:
-                            # restore CUDA_VISIBLE_DEVICES
+                        if input_cuda_visible_devices and "Alibaba-NLP" not in model_name:
+                            # restore CUDA_VISIBLE_DEVICES (but not for Alibaba-NLP models due to RTX 5090 compatibility)
                             os.environ["CUDA_VISIBLE_DEVICES"] = input_cuda_visible_devices
         self._model = DefaultEmbedding._model
         self._model_name = DefaultEmbedding._model_name

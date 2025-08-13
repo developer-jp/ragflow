@@ -346,6 +346,36 @@ class LLMBundle:
                 trace_id = self.langfuse.create_trace_id()
                 self.trace_context = {"trace_id": trace_id}
 
+    def encode(self, texts: list):
+        if self.langfuse:
+            generation = self.langfuse.start_generation(trace_context=self.trace_context, name="encode", model=self.llm_name, input={"texts": texts})
+
+        embeddings, used_tokens = self.mdl.encode(texts)
+        llm_name = getattr(self, "llm_name", None)
+        if not TenantLLMService.increase_usage(self.tenant_id, self.llm_type, used_tokens, llm_name):
+            logging.error("LLMBundle.encode can't update token usage for {}/EMBEDDING used_tokens: {}".format(self.tenant_id, used_tokens))
+
+        if self.langfuse:
+            generation.update(usage_details={"total_tokens": used_tokens})
+            generation.end()
+
+        return embeddings, used_tokens
+
+    def encode_queries(self, query: str):
+        if self.langfuse:
+            generation = self.langfuse.start_generation(trace_context=self.trace_context, name="encode_queries", model=self.llm_name, input={"query": query})
+
+        emd, used_tokens = self.mdl.encode_queries(query)
+        llm_name = getattr(self, "llm_name", None)
+        if not TenantLLMService.increase_usage(self.tenant_id, self.llm_type, used_tokens, llm_name):
+            logging.error("LLMBundle.encode_queries can't update token usage for {}/EMBEDDING used_tokens: {}".format(self.tenant_id, used_tokens))
+
+        if self.langfuse:
+            generation.update(usage_details={"total_tokens": used_tokens})
+            generation.end()
+
+        return emd, used_tokens
+
 
 class LLMBundleForAssistant(LLMBundle):
     """LLMBundle for assistant usage with fallback to creator's model configuration"""
@@ -385,36 +415,6 @@ class LLMBundleForAssistant(LLMBundle):
             logging.warning(f"Model {self.llm_name} does not support tool call, but you have assigned one or more tools to it!")
             return
         self.mdl.bind_tools(toolcall_session, tools)
-
-    def encode(self, texts: list):
-        if self.langfuse:
-            generation = self.langfuse.start_generation(trace_context=self.trace_context, name="encode", model=self.llm_name, input={"texts": texts})
-
-        embeddings, used_tokens = self.mdl.encode(texts)
-        llm_name = getattr(self, "llm_name", None)
-        if not TenantLLMService.increase_usage(self.tenant_id, self.llm_type, used_tokens, llm_name):
-            logging.error("LLMBundle.encode can't update token usage for {}/EMBEDDING used_tokens: {}".format(self.tenant_id, used_tokens))
-
-        if self.langfuse:
-            generation.update(usage_details={"total_tokens": used_tokens})
-            generation.end()
-
-        return embeddings, used_tokens
-
-    def encode_queries(self, query: str):
-        if self.langfuse:
-            generation = self.langfuse.start_generation(trace_context=self.trace_context, name="encode_queries", model=self.llm_name, input={"query": query})
-
-        emd, used_tokens = self.mdl.encode_queries(query)
-        llm_name = getattr(self, "llm_name", None)
-        if not TenantLLMService.increase_usage(self.tenant_id, self.llm_type, used_tokens, llm_name):
-            logging.error("LLMBundle.encode_queries can't update token usage for {}/EMBEDDING used_tokens: {}".format(self.tenant_id, used_tokens))
-
-        if self.langfuse:
-            generation.update(usage_details={"total_tokens": used_tokens})
-            generation.end()
-
-        return emd, used_tokens
 
     def similarity(self, query: str, texts: list):
         if self.langfuse:

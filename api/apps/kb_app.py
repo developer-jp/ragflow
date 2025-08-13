@@ -177,8 +177,10 @@ def list_kbs():
     owner_ids = req.get("owner_ids", [])
     try:
         if not owner_ids:
-            tenants = TenantService.get_joined_tenants_by_user_id(current_user.id)
-            tenants = [m["tenant_id"] for m in tenants]
+            # Get both owned tenants (where user is OWNER) and joined tenants (where user is NORMAL)
+            owned_tenants = TenantService.get_info_by(current_user.id)
+            joined_tenants = TenantService.get_joined_tenants_by_user_id(current_user.id)
+            tenants = [m["tenant_id"] for m in owned_tenants] + [m["tenant_id"] for m in joined_tenants]
             kbs, total = KnowledgebaseService.get_by_tenant_ids(
                 tenants, current_user.id, page_number,
                 items_per_page, orderby, desc, keywords, parser_id)
