@@ -74,7 +74,7 @@ def create():
 
 @manager.route('/update', methods=['post'])  # noqa: F821
 @login_required
-@validate_request("kb_id", "name", "description", "parser_id")
+@validate_request("kb_id", "name", "description")
 @not_allowed_parameters("id", "tenant_id", "created_by", "create_time", "update_time", "create_date", "update_date", "created_by")
 def update():
     req = request.json
@@ -111,6 +111,10 @@ def update():
             return get_data_error_result(
                 message="Duplicated knowledgebase name.")
 
+        # Set default parser_id if not provided
+        if "parser_id" not in req or not req["parser_id"]:
+            req["parser_id"] = "manual"
+        
         del req["kb_id"]
         if not KnowledgebaseService.update_by_id(kb.id, req):
             return get_data_error_result()
