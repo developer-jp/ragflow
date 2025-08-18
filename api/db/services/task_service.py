@@ -456,17 +456,46 @@ def reuse_prev_task_chunks(task: dict, prev_tasks: list[dict], chunking_config: 
 
 
 def cancel_all_task_of(doc_id):
+    """Cancel all tasks for a document and clean up Redis queue"""
+    # Set cancel flags for all tasks of this document
     for t in TaskService.query(doc_id=doc_id):
         try:
             REDIS_CONN.set(f"{t.id}-cancel", "x")
         except Exception as e:
             logging.exception(e)
+    
+    # Remove messages from Redis queues for this document
+    try:
+        # Clean up main queue (priority 0)
+        deleted_count_0 = REDIS_CONN.queue_delete_by_doc_id(get_svr_queue_name(0), doc_id)
+        # Clean up priority queue (priority 1) 
+        deleted_count_1 = REDIS_CONN.queue_delete_by_doc_id(get_svr_queue_name(1), doc_id)
+        
+        total_deleted = deleted_count_0 + deleted_count_1
+        if total_deleted > 0:
+            logging.info(f"Cleaned up {total_deleted} queue messages for cancelled document {doc_id}")
+            
+    except Exception as e:
+        logging.exception(f"Failed to clean up queue messages for doc_id {doc_id}: {e}")
 
 
 def has_canceled(task_id):
     try:
+        # Check Redis cancel flag first (primary method)
         if REDIS_CONN.get(f"{task_id}-cancel"):
             return True
     except Exception as e:
         logging.exception(e)
+    
+    # Fallback: Check if document is cancelled in database
+    try:
+        from api.db.services.document_service import DocumentService
+        task = TaskService.get_by_id(task_id)
+        if task and task[0]:
+            doc = DocumentService.get_by_id(task[1].doc_id)
+            if doc and doc[0] and str(doc[1].run) == "2":  # TaskStatus.CANCEL
+                return True
+    except Exception as e:
+        logging.exception(e)
+    
     return False

@@ -350,6 +350,37 @@ class RedisDB:
             self.__open__()
         return False
 
+    def queue_delete_by_doc_id(self, queue, doc_id) -> int:
+        """Delete stream messages by doc_id and return count of deleted messages"""
+        deleted_count = 0
+        for _ in range(3):
+            try:
+                # Get all messages from stream
+                messages = self.REDIS.xrange(queue, min="-", max="+")
+                message_ids_to_delete = []
+                
+                for msg_id, fields in messages:
+                    try:
+                        if b'message' in fields:
+                            message_data = json.loads(fields[b'message'].decode('utf-8'))
+                            if message_data.get('doc_id') == doc_id:
+                                message_ids_to_delete.append(msg_id)
+                    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                        logging.warning(f"Failed to parse message {msg_id}: {e}")
+                        continue
+                
+                # Delete the matching messages
+                if message_ids_to_delete:
+                    deleted_count = self.REDIS.xdel(queue, *message_ids_to_delete)
+                    logging.info(f"Deleted {deleted_count} messages for doc_id {doc_id} from queue {queue}")
+                
+                return deleted_count
+                
+            except Exception as e:
+                logging.exception(f"RedisDB.queue_delete_by_doc_id {queue} got exception: {e}")
+                self.__open__()
+        return deleted_count
+
 
 REDIS_CONN = RedisDB()
 

@@ -452,10 +452,10 @@ def run():
                 return get_data_error_result(message="Document not found!")
 
             if str(req["run"]) == TaskStatus.CANCEL.value:
-                if str(doc.run) == TaskStatus.RUNNING.value:
-                    cancel_all_task_of(id)
-                else:
-                    return get_data_error_result(message="Cannot cancel a task that is not in RUNNING status")
+                # Always cancel all tasks when document is cancelled, regardless of current status
+                cancel_all_task_of(id)
+                # Also delete existing tasks to prevent zombie tasks
+                TaskService.filter_delete([Task.doc_id == id])
 
             if str(req["run"]) == TaskStatus.RUNNING.value and str(doc.run) == TaskStatus.DONE.value:
                 DocumentService.clear_chunk_num_when_rerun(doc.id)
