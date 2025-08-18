@@ -15,6 +15,7 @@ MONITOR_SCRIPT="$RAGFLOW_HOME/scripts/monitor_task_executor.sh"
 # 环境变量
 export PYTHONPATH="$RAGFLOW_HOME"
 export CUDA_VISIBLE_DEVICES=""  # RTX 5090兼容性问题
+export MAX_CONCURRENT_CHUNK_BUILDERS="3"  # 提高chunk并发处理能力
 
 cd "$RAGFLOW_HOME"
 
