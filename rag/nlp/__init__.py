@@ -554,7 +554,11 @@ def naive_merge(sections, chunk_token_num=128, delimiter="\n。；！？", overl
         if num_tokens_from_string(sec) < chunk_token_num:
             add_chunk(sec, pos)
             continue
-        splited_sec = re.split(r"(%s)" % dels, sec, flags=re.DOTALL)
+        try:
+            splited_sec = re.split(r"(%s)" % dels, sec, flags=re.DOTALL)
+        except re.error as e:
+            logging.warning(f"Regex error in chunking (line 557): {e}, treating section as single chunk")
+            splited_sec = [sec]
         for sub_sec in splited_sec:
             if re.match(f"^{dels}$", sub_sec):
                 continue
@@ -600,13 +604,21 @@ def naive_merge_with_images(texts, images, chunk_token_num=128, delimiter="\n。
         if isinstance(text, tuple):
             text_str = text[0]
             text_pos = text[1] if len(text) > 1 else ""
-            splited_sec = re.split(r"(%s)" % dels, text_str)
+            try:
+                splited_sec = re.split(r"(%s)" % dels, text_str)
+            except re.error as e:
+                logging.warning(f"Regex error in chunking (line 607): {e}, treating text as single chunk")
+                splited_sec = [text_str]
             for sub_sec in splited_sec:
                 if re.match(f"^{dels}$", sub_sec):
                     continue
                 add_chunk(sub_sec, image, text_pos)
         else:
-            splited_sec = re.split(r"(%s)" % dels, text)
+            try:
+                splited_sec = re.split(r"(%s)" % dels, text)
+            except re.error as e:
+                logging.warning(f"Regex error in chunking (line 613): {e}, treating text as single chunk")
+                splited_sec = [text]
             for sub_sec in splited_sec:
                 if re.match(f"^{dels}$", sub_sec):
                     continue
@@ -688,7 +700,11 @@ def naive_merge_docx(sections, chunk_token_num=128, delimiter="\n。；！？"):
 
     dels = get_delimiters(delimiter)
     for sec, image in sections:
-        splited_sec = re.split(r"(%s)" % dels, sec)
+        try:
+            splited_sec = re.split(r"(%s)" % dels, sec)
+        except re.error as e:
+            logging.warning(f"Regex error in chunking (line 691): {e}, treating section as single chunk")
+            splited_sec = [sec]
         for sub_sec in splited_sec:
             if re.match(f"^{dels}$", sub_sec):
                 continue
