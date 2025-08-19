@@ -6,11 +6,8 @@ set -e
 # 配置
 RAGFLOW_HOME="/data/ragflow-deployment/ragflow"
 PID_FILE="$RAGFLOW_HOME/ragflow_production.pid"
-TASK_EXECUTOR_PID_FILE="$RAGFLOW_HOME/task_executor.pid"
 LOG_DIR="$RAGFLOW_HOME/logs"
-STARTUP_SCRIPT="$RAGFLOW_HOME/scripts/start_production_simple.py"
 TASK_EXECUTOR_COUNT=1  # 任务执行器数量
-MONITOR_SCRIPT="$RAGFLOW_HOME/scripts/monitor_task_executor.sh"
 
 # 环境变量
 export PYTHONPATH="$RAGFLOW_HOME"
@@ -81,48 +78,57 @@ start_ragflow() {
     echo "🚀 启动RAGFlow生产服务器..."
     mkdir -p "$LOG_DIR"
     
-    # 使用原始方法启动RAGFlow (避免JWT认证问题)
-    nohup .venv/bin/python api/ragflow_server.py > ragflow.log 2>&1 &
-    local pid=$!
-    echo $pid > "$PID_FILE"
+    # 激活虚拟环境并设置环境变量
+    source .venv/bin/activate
+    export PYTHONPATH=$(pwd)
+    export WS="$TASK_EXECUTOR_COUNT"  # 设置worker数量
     
-    # 等待启动
-    sleep 8
+    # 使用官方启动脚本启动所有服务
+    echo "🔄 使用官方启动脚本..."
+    nohup bash docker/launch_backend_service.sh > "$LOG_DIR/ragflow_full.log" 2>&1 &
+    local ragflow_pid=$!
+    echo $ragflow_pid > "$PID_FILE"
     
-    if is_running; then
+    # 等待服务完全启动
+    echo "⏳ 等待服务启动..."
+    sleep 15
+    
+    # 检查API服务器是否启动成功
+    local api_ready=false
+    for i in {1..30}; do
+        if curl -s http://localhost:9380/ >/dev/null 2>&1; then
+            api_ready=true
+            break
+        fi
+        sleep 1
+        echo -n "."
+    done
+    echo
+    
+    if [ "$api_ready" = true ]; then
         echo "✅ RAGFlow API服务器启动成功!"
         
-        # 启动task_executor
-        echo "🚀 启动Task Executor..."
-        > "$TASK_EXECUTOR_PID_FILE"  # 清空PID文件
-        
-        for ((i=0; i<$TASK_EXECUTOR_COUNT; i++)); do
-            nohup .venv/bin/python rag/svr/task_executor.py $i > "$LOG_DIR/task_executor_$i.log" 2>&1 &
-            local task_pid=$!
-            echo $task_pid >> "$TASK_EXECUTOR_PID_FILE"
-            echo "   Task Executor $i 启动 (PID: $task_pid)"
-        done
-        
+        # 检查task_executor进程
         sleep 3
-        
-        if is_task_executor_running; then
-            echo "✅ Task Executor启动成功!"
-            
-            # 启动监控
-            echo "🔍 启动Task Executor监控..."
-            "$MONITOR_SCRIPT" start
+        local task_pids=$(pgrep -f "task_executor.py")
+        if [ -n "$task_pids" ]; then
+            echo "✅ Task Executor进程检测到:"
+            for pid in $task_pids; do
+                local task_num=$(ps -p $pid -o args= | grep -o 'task_executor.py [0-9]*' | awk '{print $2}')
+                echo "   Task Executor $task_num (PID: $pid)"
+            done
         else
-            echo "⚠️  Task Executor启动失败，PDF解析功能将不可用"
+            echo "⚠️  Task Executor未检测到，PDF解析功能可能不可用"
         fi
         
         echo "🌐 访问地址: http://localhost:9380"
         echo "📂 日志目录: $LOG_DIR"
-        echo "🔧 API进程ID: $(get_pid)"
+        echo "🔧 主进程ID: $(get_pid)"
         echo "🔧 Task Executor PIDs: $(get_task_executor_pids | tr '\n' ' ')"
         echo "💾 内存使用: $(ps -o rss= -p $(get_pid) 2>/dev/null | awk '{print $1/1024 "MB"}' || echo '未知')"
     else
         echo "❌ RAGFlow启动失败，请查看日志:"
-        echo "   tail -50 $LOG_DIR/startup.log"
+        echo "   tail -50 $LOG_DIR/ragflow_full.log"
         rm -f "$PID_FILE"
         exit 1
     fi
@@ -131,72 +137,56 @@ start_ragflow() {
 stop_ragflow() {
     local has_service=false
     
-    # 停止Task Executor
-    if is_task_executor_running; then
+    # 停止所有相关进程
+    local ragflow_pids=$(pgrep -f "ragflow_server.py\|task_executor.py\|launch_backend_service.sh")
+    if [ -n "$ragflow_pids" ]; then
         has_service=true
-        local task_pids=$(get_task_executor_pids)
-        echo "🛑 停止Task Executor进程..."
-        for pid in $task_pids; do
-            if kill -0 "$pid" 2>/dev/null; then
-                echo "   停止Task Executor (PID: $pid)"
-                kill -TERM "$pid"
-            fi
+        echo "🛑 停止RAGFlow相关进程..."
+        for pid in $ragflow_pids; do
+            local process_name=$(ps -p $pid -o comm= 2>/dev/null || echo "unknown")
+            echo "   停止进程 $process_name (PID: $pid)"
+            kill -TERM "$pid" 2>/dev/null
         done
         
-        # 等待Task Executor停止
-        sleep 2
-        for pid in $task_pids; do
-            if kill -0 "$pid" 2>/dev/null; then
-                echo "   强制终止Task Executor (PID: $pid)"
-                kill -KILL "$pid"
-            fi
-        done
-        rm -f "$TASK_EXECUTOR_PID_FILE"
-    fi
-    
-    # 停止监控
-    if [ -f "$MONITOR_SCRIPT" ]; then
-        echo "🛑 停止Task Executor监控..."
-        "$MONITOR_SCRIPT" stop
-    fi
-    
-    # 停止API服务器
-    if ! is_running; then
-        if [ "$has_service" = false ]; then
-            echo "📴 RAGFlow未运行"
+        # 等待进程停止
+        sleep 5
+        
+        # 强制终止仍在运行的进程
+        ragflow_pids=$(pgrep -f "ragflow_server.py\|task_executor.py\|launch_backend_service.sh")
+        if [ -n "$ragflow_pids" ]; then
+            echo "⚠️  强制终止剩余进程..."
+            for pid in $ragflow_pids; do
+                echo "   强制终止 (PID: $pid)"
+                kill -KILL "$pid" 2>/dev/null
+            done
         fi
-        rm -f "$PID_FILE"
-        return 0
     fi
     
-    has_service=true
-    local pid=$(get_pid)
-    echo "🛑 停止RAGFlow API服务器 (PID: $pid)..."
-    
-    # 优雅关闭
-    kill -TERM "$pid"
-    
-    # 等待最多30秒
-    local count=0
-    while [ $count -lt 30 ] && is_running; do
-        sleep 1
-        count=$((count + 1))
-        echo -n "."
-    done
-    echo
-    
+    # 停止主进程
     if is_running; then
-        echo "⚠️  优雅关闭超时，强制终止..."
-        kill -KILL "$pid"
+        has_service=true
+        local pid=$(get_pid)
+        echo "🛑 停止主启动进程 (PID: $pid)..."
+        kill -TERM "$pid" 2>/dev/null
         sleep 2
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -KILL "$pid" 2>/dev/null
+        fi
     fi
     
-    if ! is_running; then
-        echo "✅ RAGFlow已停止"
-        rm -f "$PID_FILE"
+    # 清理PID文件
+    rm -f "$PID_FILE" "$TASK_EXECUTOR_PID_FILE"
+    
+    # 验证所有进程已停止
+    local remaining_pids=$(pgrep -f "ragflow_server.py\|task_executor.py")
+    if [ -z "$remaining_pids" ]; then
+        echo "✅ RAGFlow所有服务已停止"
     else
-        echo "❌ 无法停止RAGFlow进程"
-        exit 1
+        echo "⚠️  仍有进程在运行: $remaining_pids"
+    fi
+    
+    if [ "$has_service" = false ]; then
+        echo "📴 RAGFlow未运行"
     fi
 }
 
@@ -251,11 +241,6 @@ status_ragflow() {
             echo "⚠️  Task Executor: 未运行 (PDF解析功能不可用)"
         fi
         
-        # 检查监控状态
-        echo ""
-        if [ -f "$MONITOR_SCRIPT" ]; then
-            "$MONITOR_SCRIPT" status
-        fi
         
         # 检查Ollama模型状态
         echo ""
@@ -321,17 +306,10 @@ case "${1:-status}" in
     logs)
         logs_ragflow
         ;;
-    monitor)
-        if [ -f "$MONITOR_SCRIPT" ]; then
-            "$MONITOR_SCRIPT" "${2:-status}"
-        else
-            echo "❌ 监控脚本不存在"
-        fi
-        ;;
     *)
         echo "RAGFlow 生产环境管理脚本"
         echo ""
-        echo "用法: $0 {start|stop|restart|status|logs|monitor}"
+        echo "用法: $0 {start|stop|restart|status|logs}"
         echo ""
         echo "命令说明:"
         echo "  start   - 启动RAGFlow服务"

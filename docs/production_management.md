@@ -90,32 +90,18 @@ grep "reported heartbeat" logs/task_executor_0.log | tail -1
 2. **心跳停止** - 超过5分钟无心跳日志
 3. **僵死进程** - 进程存在但无响应
 
-### 监控管理命令
+### 监控管理
+
+RAGFlow使用官方的 `docker/launch_backend_service.sh` 脚本自动管理所有服务，包括Task Executor的监控和重启。
+
+### 服务日志
 
 ```bash
-# 启动监控
-./scripts/production_manager.sh monitor start
+# 查看Task Executor日志
+tail -f logs/task_executor_0.log
 
-# 停止监控
-./scripts/production_manager.sh monitor stop
-
-# 查看监控状态
-./scripts/production_manager.sh monitor status
-
-# 直接使用监控脚本
-./scripts/monitor_task_executor.sh start
-./scripts/monitor_task_executor.sh stop
-./scripts/monitor_task_executor.sh status
-```
-
-### 监控日志
-
-```bash
-# 查看监控日志
-tail -f logs/task_executor_monitor.log
-
-# 查看监控历史
-cat logs/task_executor_monitor.log
+# 查看完整服务日志
+tail -f logs/ragflow_full.log
 ```
 
 ## 故障排除
@@ -142,10 +128,6 @@ grep "pending" logs/task_executor_0.log | tail -1
 ```bash
 # 重启服务
 ./scripts/production_manager.sh restart
-
-# 或者只重启Task Executor
-pkill -f task_executor
-# 监控会自动重启
 ```
 
 #### 2. Task Executor内存过高
@@ -337,8 +319,7 @@ chmod +x performance_monitor.sh
 
 1. **Alibaba-NLP必须使用CPU**: `CUDA_VISIBLE_DEVICES=""`
 2. **Task Executor内存使用4-8GB是正常的**
-3. **监控系统会自动重启异常服务**
-4. **不要手动终止monitor_task_executor进程**
+3. **使用官方脚本**: 直接使用 `docker/launch_backend_service.sh`
 
 ### 🔧 维护建议
 
