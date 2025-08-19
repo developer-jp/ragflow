@@ -6,13 +6,14 @@ set -e
 # 配置
 RAGFLOW_HOME="/data/ragflow-deployment/ragflow"
 PID_FILE="$RAGFLOW_HOME/ragflow_production.pid"
+TASK_EXECUTOR_PID_FILE="$RAGFLOW_HOME/task_executor.pid"
 LOG_DIR="$RAGFLOW_HOME/logs"
-TASK_EXECUTOR_COUNT=1  # 任务执行器数量
+TASK_EXECUTOR_COUNT=2  # 任务执行器数量
 
 # 环境变量
 export PYTHONPATH="$RAGFLOW_HOME"
 export CUDA_VISIBLE_DEVICES=""  # RTX 5090兼容性问题
-export MAX_CONCURRENT_CHUNK_BUILDERS="3"  # 提高chunk并发处理能力
+export MAX_CONCURRENT_CHUNK_BUILDERS="6"  # 提高chunk并发处理能力
 
 cd "$RAGFLOW_HOME"
 
@@ -33,19 +34,13 @@ is_running() {
 }
 
 get_task_executor_pids() {
-    if [ -f "$TASK_EXECUTOR_PID_FILE" ]; then
-        cat "$TASK_EXECUTOR_PID_FILE"
-    fi
+    pgrep -f "task_executor.py" | grep -v grep
 }
 
 is_task_executor_running() {
     local pids=$(get_task_executor_pids)
     if [ -n "$pids" ]; then
-        for pid in $pids; do
-            if kill -0 "$pid" 2>/dev/null; then
-                return 0
-            fi
-        done
+        return 0
     fi
     return 1
 }
@@ -138,24 +133,50 @@ stop_ragflow() {
     local has_service=false
     
     # 停止所有相关进程
-    local ragflow_pids=$(pgrep -f "ragflow_server.py\|task_executor.py\|launch_backend_service.sh")
-    if [ -n "$ragflow_pids" ]; then
+    echo "🛑 停止RAGFlow相关进程..."
+    
+    # 分别查找和停止不同类型的进程
+    local task_pids=$(pgrep -f "task_executor.py")
+    local server_pids=$(pgrep -f "ragflow_server.py") 
+    local launch_pids=$(pgrep -f "launch_backend_service.sh")
+    
+    # 停止Task Executor进程
+    if [ -n "$task_pids" ]; then
         has_service=true
-        echo "🛑 停止RAGFlow相关进程..."
-        for pid in $ragflow_pids; do
-            local process_name=$(ps -p $pid -o comm= 2>/dev/null || echo "unknown")
-            echo "   停止进程 $process_name (PID: $pid)"
+        for pid in $task_pids; do
+            echo "   停止Task Executor (PID: $pid)"
             kill -TERM "$pid" 2>/dev/null
         done
-        
+    fi
+    
+    # 停止Server进程
+    if [ -n "$server_pids" ]; then
+        has_service=true
+        for pid in $server_pids; do
+            echo "   停止RAGFlow Server (PID: $pid)"
+            kill -TERM "$pid" 2>/dev/null
+        done
+    fi
+    
+    # 停止Launch脚本进程
+    if [ -n "$launch_pids" ]; then
+        has_service=true
+        for pid in $launch_pids; do
+            echo "   停止Launch Script (PID: $pid)"
+            kill -TERM "$pid" 2>/dev/null
+        done
+    fi
+    
+    # 如果有服务在运行，等待进程停止并强制终止剩余进程
+    if [ "$has_service" = true ]; then
         # 等待进程停止
         sleep 5
         
         # 强制终止仍在运行的进程
-        ragflow_pids=$(pgrep -f "ragflow_server.py\|task_executor.py\|launch_backend_service.sh")
-        if [ -n "$ragflow_pids" ]; then
+        local remaining_pids=$(pgrep -f "task_executor.py|ragflow_server.py|launch_backend_service.sh")
+        if [ -n "$remaining_pids" ]; then
             echo "⚠️  强制终止剩余进程..."
-            for pid in $ragflow_pids; do
+            for pid in $remaining_pids; do
                 echo "   强制终止 (PID: $pid)"
                 kill -KILL "$pid" 2>/dev/null
             done
