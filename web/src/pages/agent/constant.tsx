@@ -20,6 +20,7 @@ import {
 import { ModelVariableType } from '@/constants/knowledge';
 import i18n from '@/locales/config';
 import { setInitialChatVariableEnabledFieldValue } from '@/utils/chat';
+import { t } from 'i18next';
 
 // DuckDuckGo's channel options
 export enum Channel {
@@ -87,6 +88,7 @@ export enum Operator {
   TavilyExtract = 'TavilyExtract',
   UserFillUp = 'UserFillUp',
   StringTransform = 'StringTransform',
+  SearXNG = 'SearXNG',
 }
 
 export const SwitchLogicOperatorOptions = ['and', 'or'];
@@ -210,6 +212,9 @@ export const componentMenuList = [
   {
     name: Operator.Email,
   },
+  {
+    name: Operator.SearXNG,
+  },
 ];
 
 export const SwitchOperatorOptions = [
@@ -326,6 +331,22 @@ export const initialKeywordExtractValues = {
 export const initialDuckValues = {
   top_n: 10,
   channel: Channel.Text,
+  query: AgentGlobals.SysQuery,
+  outputs: {
+    formalized_content: {
+      value: '',
+      type: 'string',
+    },
+    json: {
+      value: [],
+      type: 'Array<Object>',
+    },
+  },
+};
+
+export const initialSearXNGValues = {
+  top_n: '10',
+  searxng_url: '',
   query: AgentGlobals.SysQuery,
   outputs: {
     formalized_content: {
@@ -630,16 +651,7 @@ export const initialAgentValues = {
   ...initialLlmBaseValues,
   description: '',
   user_prompt: '',
-  sys_prompt: `<role>
-  You are {{agent_name}}, an AI assistant specialized in {{domain_or_task}}.
-</role>
-<instructions>
-  1. Understand the user’s request.  
-  2. Decompose it into logical subtasks.  
-  3. Execute each subtask step by step, reasoning transparently.  
-  4. Validate accuracy and consistency.  
-  5. Summarize the final result clearly.
-</instructions>`,
+  sys_prompt: t('flow.sysPromptDefultValue'),
   prompts: [{ role: PromptRole.User, content: `{${AgentGlobals.SysQuery}}` }],
   message_history_window_size: 12,
   max_retries: 3,
@@ -815,6 +827,7 @@ export const RestrictedUpstreamMap = {
   [Operator.GitHub]: [Operator.Begin, Operator.Retrieval],
   [Operator.BaiduFanyi]: [Operator.Begin, Operator.Retrieval],
   [Operator.QWeather]: [Operator.Begin, Operator.Retrieval],
+  [Operator.SearXNG]: [Operator.Begin, Operator.Retrieval],
   [Operator.ExeSQL]: [Operator.Begin],
   [Operator.Switch]: [Operator.Begin],
   [Operator.WenCai]: [Operator.Begin],
@@ -859,6 +872,7 @@ export const NodeMap = {
   [Operator.GitHub]: 'ragNode',
   [Operator.BaiduFanyi]: 'ragNode',
   [Operator.QWeather]: 'ragNode',
+  [Operator.SearXNG]: 'ragNode',
   [Operator.ExeSQL]: 'ragNode',
   [Operator.Switch]: 'switchNode',
   [Operator.Concentrator]: 'logicNode',

@@ -3,13 +3,28 @@ import { useFetchAgent } from '@/hooks/use-agent-request';
 import { RAGFlowNodeType } from '@/interfaces/database/flow';
 import { Edge } from '@xyflow/react';
 import { DefaultOptionType } from 'antd/es/select';
+import { t } from 'i18next';
 import { isEmpty } from 'lodash';
 import get from 'lodash/get';
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { BeginId, BeginQueryType, Operator, VariableType } from '../constant';
+import {
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import {
+  AgentDialogueMode,
+  BeginId,
+  BeginQueryType,
+  Operator,
+  VariableType,
+} from '../constant';
 import { AgentFormContext } from '../context';
 import { buildBeginInputListFromObject } from '../form/begin-form/utils';
 import { BeginQuery } from '../interface';
+import OperatorIcon from '../operator-icon';
 import useGraphStore from '../store';
 
 export function useSelectBeginNodeDataInputs() {
@@ -18,6 +33,15 @@ export function useSelectBeginNodeDataInputs() {
   return buildBeginInputListFromObject(
     getNode(BeginId)?.data?.form?.inputs ?? {},
   );
+}
+
+export function useIsTaskMode() {
+  const getNode = useGraphStore((state) => state.getNode);
+
+  return useMemo(() => {
+    const node = getNode(BeginId);
+    return node?.data?.form?.mode === AgentDialogueMode.Task;
+  }, [getNode]);
 }
 
 export const useGetBeginNodeDataQuery = () => {
@@ -82,10 +106,14 @@ function filterAllUpstreamNodeIds(edges: Edge[], nodeIds: string[]) {
 export function buildOutputOptions(
   outputs: Record<string, any> = {},
   nodeId?: string,
+  parentLabel?: string | ReactNode,
+  icon?: ReactNode,
 ) {
   return Object.keys(outputs).map((x) => ({
     label: x,
     value: `${nodeId}@${x}`,
+    parentLabel,
+    icon,
     type: outputs[x]?.type,
   }));
 }
@@ -111,7 +139,12 @@ export function useBuildNodeOutputOptions(nodeId?: string) {
         label: x.data.name,
         value: x.id,
         title: x.data.name,
-        options: buildOutputOptions(x.data.form.outputs, x.id),
+        options: buildOutputOptions(
+          x.data.form.outputs,
+          x.id,
+          x.data.name,
+          <OperatorIcon name={x.data.label as Operator} />,
+        ),
       }));
   }, [edges, nodeId, nodes]);
 
@@ -145,10 +178,12 @@ export function useBuildBeginVariableOptions() {
   const options = useMemo(() => {
     return [
       {
-        label: <span>Begin Input</span>,
-        title: 'Begin Input',
+        label: <span>{t('flow.beginInput')}</span>,
+        title: t('flow.beginInput'),
         options: inputs.map((x) => ({
           label: x.name,
+          parentLabel: <span>{t('flow.beginInput')}</span>,
+          icon: <OperatorIcon name={Operator.Begin} className="block" />,
           value: `begin@${x.key}`,
           type: transferToVariableType(x.type),
         })),
@@ -175,12 +210,13 @@ export function useBuildQueryVariableOptions(n?: RAGFlowNodeType) {
   const { data } = useFetchAgent();
   const node = useContext(AgentFormContext) || n;
   const options = useBuildVariableOptions(node?.id, node?.parentId);
-
   const nextOptions = useMemo(() => {
     const globals = data?.dsl?.globals ?? {};
     const globalOptions = Object.entries(globals).map(([key, value]) => ({
       label: key,
       value: key,
+      icon: <OperatorIcon name={Operator.Begin} className="block" />,
+      parentLabel: <span>{t('flow.beginInput')}</span>,
       type: Array.isArray(value)
         ? `${VariableType.Array}${key === AgentGlobals.SysFiles ? '<file>' : ''}`
         : typeof value,

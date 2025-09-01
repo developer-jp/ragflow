@@ -1,11 +1,10 @@
 // src/pages/next-search/search-setting.tsx
 
+import { AvatarUpload } from '@/components/avatar-upload';
 import {
   MetadataFilter,
   MetadataFilterSchema,
 } from '@/components/metadata-filter';
-import { Input } from '@/components/originui/input';
-import { RAGFlowAvatar } from '@/components/ragflow-avatar';
 import { Button } from '@/components/ui/button';
 import { SingleFormSlider } from '@/components/ui/dual-range-slider';
 import {
@@ -16,6 +15,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import {
   MultiSelect,
   MultiSelectOptionType,
@@ -31,9 +31,8 @@ import {
 import { useFetchTenantInfo } from '@/hooks/user-setting-hooks';
 import { IKnowledge } from '@/interfaces/database/knowledge';
 import { cn } from '@/lib/utils';
-import { transformFile2Base64 } from '@/utils/file-util';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Pencil, Upload, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -110,8 +109,6 @@ const SearchSetting: React.FC<SearchSettingProps> = ({
     resolver: zodResolver(SearchSettingFormSchema),
   });
 
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarBase64Str, setAvatarBase64Str] = useState(''); // Avatar Image base64
   const [datasetList, setDatasetList] = useState<MultiSelectOptionType[]>([]);
   const [datasetSelectEmbdId, setDatasetSelectEmbdId] = useState('');
   const { t } = useTranslation();
@@ -140,10 +137,10 @@ const SearchSetting: React.FC<SearchSettingProps> = ({
         llm_setting: {
           llm_id: search_config?.chat_id || '',
           parameter: llm_setting?.parameter,
-          temperature: llm_setting?.temperature,
-          top_p: llm_setting?.top_p,
-          frequency_penalty: llm_setting?.frequency_penalty,
-          presence_penalty: llm_setting?.presence_penalty,
+          temperature: llm_setting?.temperature || 0,
+          top_p: llm_setting?.top_p || 0,
+          frequency_penalty: llm_setting?.frequency_penalty || 0,
+          presence_penalty: llm_setting?.presence_penalty || 0,
           temperatureEnabled: llm_setting?.temperature ? true : false,
           topPEnabled: llm_setting?.top_p ? true : false,
           presencePenaltyEnabled: llm_setting?.presence_penalty ? true : false,
@@ -174,19 +171,7 @@ const SearchSetting: React.FC<SearchSettingProps> = ({
       setWidth0('w-[440px]');
     }
   }, [open]);
-  useEffect(() => {
-    if (!avatarFile) {
-      setAvatarBase64Str(data?.avatar);
-    }
-  }, [avatarFile, data?.avatar]);
-  useEffect(() => {
-    if (avatarFile) {
-      (async () => {
-        // make use of img compression transformFile2Base64
-        setAvatarBase64Str(await transformFile2Base64(avatarFile));
-      })();
-    }
-  }, [avatarFile]);
+
   const { list: datasetListOrigin } = useFetchKnowledgeList();
 
   useEffect(() => {
@@ -273,7 +258,6 @@ const SearchSetting: React.FC<SearchSettingProps> = ({
           llm_setting: { ...llmSetting },
         },
         tenant_id: systemSetting.tenant_id,
-        avatar: avatarBase64Str,
       });
       setOpen(false);
     } catch (error) {
@@ -337,59 +321,11 @@ const SearchSetting: React.FC<SearchSettingProps> = ({
             <FormField
               control={formMethods.control}
               name="avatar"
-              render={() => (
+              render={({ field }) => (
                 <FormItem>
                   <FormLabel>{t('search.avatar')}</FormLabel>
                   <FormControl>
-                    <div className="relative group flex items-end gap-2">
-                      <div>
-                        {!avatarBase64Str ? (
-                          <div className="w-[64px] h-[64px] grid place-content-center border border-dashed	rounded-md">
-                            <div className="flex flex-col items-center">
-                              <Upload />
-                              <p>{t('common.upload')}</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="w-[64px] h-[64px] relative grid place-content-center">
-                            <RAGFlowAvatar
-                              avatar={avatarBase64Str}
-                              name={data.name}
-                              className="w-[64px] h-[64px] rounded-md block"
-                            />
-                            <div className="absolute inset-0 bg-[#000]/20 group-hover:bg-[#000]/60">
-                              <Pencil
-                                size={20}
-                                className="absolute right-2 bottom-0 opacity-50 hidden group-hover:block"
-                              />
-                            </div>
-                          </div>
-                        )}
-                        <input
-                          placeholder=""
-                          // {...field}
-                          type="file"
-                          title=""
-                          accept="image/*"
-                          className="absolute w-[64px] top-0 left-0 h-full opacity-0 cursor-pointer"
-                          onChange={(ev) => {
-                            const file = ev.target?.files?.[0];
-                            if (
-                              /\.(jpg|jpeg|png|webp|bmp)$/i.test(
-                                file?.name ?? '',
-                              )
-                            ) {
-                              setAvatarFile(file!);
-                            }
-                            ev.target.value = '';
-                          }}
-                        />
-                      </div>
-
-                      <div className="margin-1 text-muted-foreground">
-                        {t('knowledgeConfiguration.photoTip')}
-                      </div>
-                    </div>
+                    <AvatarUpload {...field}></AvatarUpload>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
