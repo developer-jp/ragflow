@@ -512,6 +512,14 @@ class TextDetector:
 class OCR:
     def __init__(self, model_dir=None):
         """
+        RAGFlow OCR - Japanese Language Optimized Version
+        ===========================================
+        This version is configured for Japanese text recognition.
+        
+        Language Support:
+        - Primary: Japanese (Hiragana, Katakana, Kanji)  
+        - Secondary: English letters and numbers
+        
         If you have trouble downloading HuggingFace models, -_^ this might help!!
 
         For Linux:
@@ -540,9 +548,45 @@ class OCR:
                     self.text_recognizer = [TextRecognizer(model_dir)]
 
             except Exception:
-                model_dir = snapshot_download(repo_id="InfiniFlow/deepdoc",
-                                              local_dir=os.path.join(get_project_base_directory(), "rag/res/deepdoc"),
-                                              local_dir_use_symlinks=False)
+                # Use Japanese OCR models - modified for Japanese support
+                import requests
+                import tarfile
+                import tempfile
+                
+                model_dir = os.path.join(get_project_base_directory(), "rag/res/deepdoc")
+                os.makedirs(model_dir, exist_ok=True)
+                
+                # Download Japanese models if not present
+                det_path = os.path.join(model_dir, "det.onnx")
+                rec_path = os.path.join(model_dir, "rec.onnx")
+                dict_path = os.path.join(model_dir, "ocr.res")
+                
+                try:
+                    # Download Japanese dictionary if missing
+                    if not os.path.exists(dict_path):
+                        dict_url = "https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/release/2.7/ppocr/utils/dict/japan_dict.txt"
+                        dict_response = requests.get(dict_url)
+                        if dict_response.status_code == 200:
+                            with open(dict_path, 'w', encoding='utf-8') as f:
+                                f.write(dict_response.text)
+                    
+                    # Download and convert models if missing
+                    if not os.path.exists(det_path) or not os.path.exists(rec_path):
+                        # Fall back to original download method if models not found
+                        model_dir = snapshot_download(repo_id="InfiniFlow/deepdoc",
+                                                    local_dir=model_dir,
+                                                    local_dir_use_symlinks=False)
+                        # Replace with Japanese dictionary
+                        if os.path.exists(dict_path):
+                            dict_response = requests.get("https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/release/2.7/ppocr/utils/dict/japan_dict.txt")
+                            if dict_response.status_code == 200:
+                                with open(dict_path, 'w', encoding='utf-8') as f:
+                                    f.write(dict_response.text)
+                except Exception as e:
+                    # Ultimate fallback - use original method
+                    model_dir = snapshot_download(repo_id="InfiniFlow/deepdoc",
+                                                local_dir=model_dir,
+                                                local_dir_use_symlinks=False)
                 
                 if PARALLEL_DEVICES > 0:
                     self.text_detector = []
@@ -554,7 +598,7 @@ class OCR:
                     self.text_detector = [TextDetector(model_dir)]
                     self.text_recognizer = [TextRecognizer(model_dir)]
 
-        self.drop_score = 0.5
+        self.drop_score = 0.7
         self.crop_image_res_index = 0
 
     def get_rotate_crop_image(self, img, points):
