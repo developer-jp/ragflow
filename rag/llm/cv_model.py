@@ -65,20 +65,12 @@ class Base(ABC):
 
         pmpt = [{"type": "text", "text": text}]
         for img in images:
-            pmpt.append({
-                "type": "image_url",
-                "image_url": {
-                    "url": img if isinstance(img, str) and img.startswith("data:") else f"data:image/png;base64,{img}"
-                }
-            })
+            pmpt.append({"type": "image_url", "image_url": {"url": img if isinstance(img, str) and img.startswith("data:") else f"data:image/png;base64,{img}"}})
         return pmpt
 
     def chat(self, system, history, gen_conf, images=[], **kwargs):
         try:
-            response = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=self._form_history(system, history, images)
-            )
+            response = self.client.chat.completions.create(model=self.model_name, messages=self._form_history(system, history, images))
             return response.choices[0].message.content.strip(), response.usage.total_tokens
         except Exception as e:
             return "**ERROR**: " + str(e), 0
@@ -87,11 +79,7 @@ class Base(ABC):
         ans = ""
         tk_count = 0
         try:
-            response = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=self._form_history(system, history, images),
-                stream=True
-            )
+            response = self.client.chat.completions.create(model=self.model_name, messages=self._form_history(system, history, images), stream=True)
             for resp in response:
                 if not resp.choices[0].delta.content:
                     continue
@@ -145,18 +133,13 @@ class Base(ABC):
                     "请用中文详细描述一下图中的内容，比如时间，地点，人物，事情，人物心情等，如果有数据请提取出数据。"
                     if self.lang.lower() == "chinese"
                     else "Please describe the content of this picture, like where, when, who, what happen. If it has number data, please extract them out.",
-                    b64
-                )
+                    b64,
+                ),
             }
         ]
 
     def vision_llm_prompt(self, b64, prompt=None):
-        return [
-            {
-                "role": "user",
-                "content": self._image_prompt(prompt if prompt else vision_llm_describe_prompt(), b64)
-            }
-        ]
+        return [{"role": "user", "content": self._image_prompt(prompt if prompt else vision_llm_describe_prompt(), b64)}]
 
 
 class GptV4(Base):
@@ -286,13 +269,7 @@ class TogetherAICV(GptV4):
 class YiCV(GptV4):
     _FACTORY_NAME = "01.AI"
 
-    def __init__(
-            self,
-            key,
-            model_name,
-            lang="Chinese",
-            base_url="https://api.lingyiwanwu.com/v1", **kwargs
-    ):
+    def __init__(self, key, model_name, lang="Chinese", base_url="https://api.lingyiwanwu.com/v1", **kwargs):
         if not base_url:
             base_url = "https://api.lingyiwanwu.com/v1"
         super().__init__(key, model_name, lang, base_url, **kwargs)
@@ -301,13 +278,7 @@ class YiCV(GptV4):
 class SILICONFLOWCV(GptV4):
     _FACTORY_NAME = "SILICONFLOW"
 
-    def __init__(
-            self,
-            key,
-            model_name,
-            lang="Chinese",
-            base_url="https://api.siliconflow.cn/v1", **kwargs
-    ):
+    def __init__(self, key, model_name, lang="Chinese", base_url="https://api.siliconflow.cn/v1", **kwargs):
         if not base_url:
             base_url = "https://api.siliconflow.cn/v1"
         super().__init__(key, model_name, lang, base_url, **kwargs)
@@ -316,13 +287,7 @@ class SILICONFLOWCV(GptV4):
 class OpenRouterCV(GptV4):
     _FACTORY_NAME = "OpenRouter"
 
-    def __init__(
-            self,
-            key,
-            model_name,
-            lang="Chinese",
-            base_url="https://openrouter.ai/api/v1", **kwargs
-    ):
+    def __init__(self, key, model_name, lang="Chinese", base_url="https://openrouter.ai/api/v1", **kwargs):
         if not base_url:
             base_url = "https://openrouter.ai/api/v1"
         self.client = OpenAI(api_key=key, base_url=base_url)
@@ -383,18 +348,18 @@ class OllamaCV(Base):
 
     def __init__(self, key, model_name, lang="Chinese", **kwargs):
         from ollama import Client
+
         self.client = Client(host=kwargs["base_url"])
         self.model_name = model_name
         self.lang = lang
         self.keep_alive = kwargs.get("ollama_keep_alive", int(os.environ.get("OLLAMA_KEEP_ALIVE", -1)))
         Base.__init__(self, **kwargs)
 
-
     def _clean_img(self, img):
         if not isinstance(img, str):
             return img
 
-        #remove the header like "data/*;base64,"
+        # remove the header like "data/*;base64,"
         if img.startswith("data:") and ";base64," in img:
             img = img.split(";base64,")[1]
         return img
@@ -454,12 +419,7 @@ class OllamaCV(Base):
 
     def chat(self, system, history, gen_conf, images=[]):
         try:
-            response = self.client.chat(
-                model=self.model_name,
-                messages=self._form_history(system, history, images),
-                options=self._clean_conf(gen_conf),
-                keep_alive=self.keep_alive
-            )
+            response = self.client.chat(model=self.model_name, messages=self._form_history(system, history, images), options=self._clean_conf(gen_conf), keep_alive=self.keep_alive)
 
             ans = response["message"]["content"].strip()
             return ans, response["eval_count"] + response.get("prompt_eval_count", 0)
@@ -469,13 +429,7 @@ class OllamaCV(Base):
     def chat_streamly(self, system, history, gen_conf, images=[]):
         ans = ""
         try:
-            response = self.client.chat(
-                model=self.model_name,
-                messages=self._form_history(system, history, images),
-                stream=True,
-                options=self._clean_conf(gen_conf),
-                keep_alive=self.keep_alive
-            )
+            response = self.client.chat(model=self.model_name, messages=self._form_history(system, history, images), stream=True, options=self._clean_conf(gen_conf), keep_alive=self.keep_alive)
             for resp in response:
                 if resp["done"]:
                     yield resp.get("prompt_eval_count", 0) + resp.get("eval_count", 0)
@@ -505,9 +459,9 @@ class GeminiCV(Base):
         if system:
             hist.append({"role": "user", "parts": [system, history[0]["content"]]})
         for img in images:
-            hist[0]["parts"].append(("data:image/jpeg;base64," + img) if img[:4]!="data" else img)
+            hist[0]["parts"].append(("data:image/jpeg;base64," + img) if img[:4] != "data" else img)
         for h in history[1:]:
-            hist.append({"role": "user" if h["role"]=="user" else "model", "parts": [h["content"]]})
+            hist.append({"role": "user" if h["role"] == "user" else "model", "parts": [h["content"]]})
         return hist
 
     def describe(self, image):
@@ -528,9 +482,17 @@ class GeminiCV(Base):
     def describe_with_prompt(self, image, prompt=None):
         from PIL.Image import open
 
-        b64 = self.image2base64(image)
+        b64_data_url = self.image2base64(image)
         vision_prompt = prompt if prompt else vision_llm_describe_prompt()
-        img = open(BytesIO(base64.b64decode(b64)))
+
+        # Extract base64 data from data URL if needed
+        if b64_data_url.startswith("data:") and ";base64," in b64_data_url:
+            # Split off the data URL prefix to get just the base64 part
+            b64_str = b64_data_url.split(";base64,")[1]
+        else:
+            b64_str = b64_data_url
+
+        img = open(BytesIO(base64.b64decode(b64_str)))
         input = [vision_prompt, img]
         res = self.model.generate_content(
             input,
@@ -541,9 +503,7 @@ class GeminiCV(Base):
     def chat(self, system, history, gen_conf, images=[]):
         generation_config = dict(temperature=gen_conf.get("temperature", 0.3), top_p=gen_conf.get("top_p", 0.7))
         try:
-            response = self.model.generate_content(
-                self._form_history(system, history, images),
-                generation_config=generation_config)
+            response = self.model.generate_content(self._form_history(system, history, images), generation_config=generation_config)
             ans = response.text
             return ans, response.usage_metadata.total_token_count
         except Exception as e:
@@ -577,13 +537,7 @@ class GeminiCV(Base):
 class NvidiaCV(Base):
     _FACTORY_NAME = "NVIDIA"
 
-    def __init__(
-        self,
-        key,
-        model_name,
-        lang="Chinese",
-        base_url="https://ai.api.nvidia.com/v1/vlm", **kwargs
-    ):
+    def __init__(self, key, model_name, lang="Chinese", base_url="https://ai.api.nvidia.com/v1/vlm", **kwargs):
         if not base_url:
             base_url = ("https://ai.api.nvidia.com/v1/vlm",)
         self.lang = lang
@@ -628,9 +582,7 @@ class NvidiaCV(Base):
                 "content-type": "application/json",
                 "Authorization": f"Bearer {self.key}",
             },
-            json={
-                "messages": msg, **gen_conf
-            },
+            json={"messages": msg, **gen_conf},
         )
         return response.json()
 
@@ -687,14 +639,15 @@ class AnthropicCV(Base):
             return text
         pmpt = [{"type": "text", "text": text}]
         for img in images:
-            pmpt.append({
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": (img.split(":")[1].split(";")[0] if isinstance(img, str) and img[:4] == "data" else "image/png"),
-                            "data": (img.split(",")[1] if isinstance(img, str) and img[:4] == "data" else img)
-                        },
-                    }
+            pmpt.append(
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": (img.split(":")[1].split(";")[0] if isinstance(img, str) and img[:4] == "data" else "image/png"),
+                        "data": (img.split(",")[1] if isinstance(img, str) and img[:4] == "data" else img),
+                    },
+                }
             )
         return pmpt
 
