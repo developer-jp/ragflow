@@ -1,0 +1,108 @@
+FRP (fiber reinforced plastic) 600 n_hvac
+HACCP (Hazard Analysis and Critical Control Point) 600 n_hvac
+HEPAフィルタ (High Efficiency Particulate Air filter) 600 n_hvac
+MEPAフィルタ (Medium Efficiency Particulate Air filter) 600 n_hvac
+PID動作 (proportional plus integral plus derivative action) 600 n_hvac
+ULPAフィルタ (ultra low penetration air filter) 600 n_hvac
+a接点 (a-contact) 600 n_hvac
+がらり (louver) 600 n_hvac
+アスペクト比 600 n_hvac
+アネモ型吹出し口 (Anemostat diffuser) 600 n_hvac
+インスタントカップリング 600 n_hvac
+ウォータハンマ (water hammer) 600 n_hvac
+エアハンドリングユニット (air handling unit) 600 n_hvac
+エアーカーテン装置 (air curtain) 600 n_hvac
+エリミネーター (eliminator) 600 n_hvac
+エンタルピー (enthalpy) 600 n_hvac
+オフセット (offset) 600 n_hvac
+オンオフ制御 (on-off control) 600 n_hvac
+キャビテーション (cavitation) 600 n_hvac
+ケミカル・フィルタ 600 n_hvac
+コミッショニング (commissioning) 600 n_hvac
+コンバータ (converter) 600 n_hvac
+コージェネレーション 600 n_hvac
+コールドドラフト (cold draft) 600 n_hvac
+サージング現象 (surging) 600 n_hvac
+サーボ機構 (Servo-Mechanism、Servo-Controler) 600 n_hvac
+サーミスタ (thermister) 600 n_hvac
+シーケンス制御 (sequence control) 600 n_hvac
+スター結線 (star connection) 600 n_hvac
+ステップ応答 (step response) 600 n_hvac
+スライム (slime) 600 n_hvac
+スーパークリーンルーム (super clean room) 600 n_hvac
+スーパードライルーム (super dry room) 600 n_hvac
+ドライ運転 600 n_hvac
+ドラフト (draft) 600 n_hvac
+ノーマルオープン (normally open) 600 n_hvac
+ノーマルクローズ (normally close) 600 n_hvac
+ハンチング (hunting) 600 n_hvac
+バイオクリーンルーム (bioclean room) 600 n_hvac
+バタフライ弁 600 n_hvac
+バリデーション 600 n_hvac
+ヒートパイプ (heat pipe) 600 n_hvac
+ファンコイル 600 n_hvac
+ファンフィルタユニット (FFU) 600 n_hvac
+フィードバック制御 600 n_hvac
+フィードフォーワード制御 (feed forward control) 600 n_hvac
+ブライン 600 n_hvac
+ブロア (blower) 600 n_hvac
+プレナム室 (plenum chamber) 600 n_hvac
+ベルマウス (bell mouth) 600 n_hvac
+ホットガスバイパス (hot gas bypass) 600 n_hvac
+ポンプダウン (pump down) 600 n_hvac
+リターンエア (return air) 600 n_hvac
+リターンダクト (return duct) 600 n_hvac
+一酸化炭素 (carbon monoxide) 600 n_hvac
+不快指数 (discomfort index) 600 n_hvac
+中温空調 600 n_hvac
+乱流式クリーンルーム 600 n_hvac
+体感温度 (human environmental tempraturecontrol) 600 n_hvac
+全熱交換器 (total heat exchanger) 600 n_hvac
+共通仕様書 (general specification) 600 n_hvac
+冷凍トン (refrigeration(ton of)) 600 n_hvac
+効果温度 (operative temperature) 600 n_hvac
+効率 600 n_hvac
+動圧 (dynamic pressure) 600 n_hvac
+可変風量制御装置 600 n_hvac
+吸音材 (sound absorbing material) 600 n_hvac
+呼吸熱 600 n_hvac
+変風量方式 600 n_hvac
+層流型クリーンルーム 600 n_hvac
+微分動作 (derivative action) 600 n_hvac
+快感温度 (comfortable temperature) 600 n_hvac
+換気設備 (ventilation equipment) 600 n_hvac
+揮発性有機化合物 (VOC：Volatile Organic Compounds) 600 n_hvac
+暗騒音 (background noise) 600 n_hvac
+比例動作 (proportional action) 600 n_hvac
+水蓄熱 600 n_hvac
+水道用硬質塩化ビニルライニング鋼管 600 n_hvac
+氷蓄熱槽 600 n_hvac
+温室効果 600 n_hvac
+測温抵抗体 600 n_hvac
+潜熱 (latent heat) 600 n_hvac
+熱伝導率 (heat conductivity、thermal conductivity) 600 n_hvac
+熱貫流率 (coefficient of overall heat transmission) 600 n_hvac
+熱電対 (thermo couple) 600 n_hvac
+産業空気調和 (industrial air conditioning) 600 n_hvac
+相対湿度 (relative humidity) 600 n_hvac
+硬質塩化ビニル管 (unplasticized polyvinyl chloride pipe) 600 n_hvac
+積分動作 (integral action) 600 n_hvac
+米冷凍トン 600 n_hvac
+結露 (vapour condensation) 600 n_hvac
+給気口 (air supplying opening(outlet)) 600 n_hvac
+絶対圧力 (absolute pressure) 600 n_hvac
+絶対温度 (absolute temperature) 600 n_hvac
+絶対湿度 (absolute humidity) 600 n_hvac
+蓄熱槽 600 n_hvac
+設計図書 600 n_hvac
+超音波加湿器 (ultrasonic humidifier) 600 n_hvac
+送風機の法則 (fan law) 600 n_hvac
+過冷却 600 n_hvac
+過熱度 (degree of superheat) 600 n_hvac
+露点 (dew point) 600 n_hvac
+露点制御 (dew point control) 600 n_hvac
+静圧 (static pressure) 600 n_hvac
+顕熱 (sensible heat) 600 n_hvac
+顕熱比 600 n_hvac
+養生 600 n_hvac
+高速ダクト (high velocity duct) 600 n_hvac

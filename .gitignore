@@ -29,7 +29,9 @@ Cargo.lock
 docker/ragflow-logs/
 /flask_session
 /logs
-rag/res/deepdoc
+rag/res/deepdoc/*
+!rag/res/deepdoc/ocr.res
+rag/res/huqie_cache/
 
 # Exclude sdk generated files
 sdk/python/ragflow.egg-info/
