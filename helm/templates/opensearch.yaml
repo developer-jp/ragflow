@@ -32,7 +32,7 @@ spec:
       {{- include "ragflow.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: opensearch
   {{- with .Values.opensearch.deployment.strategy }}
-  strategy:
+  updateStrategy:
     {{- . | toYaml | nindent 4 }}
   {{- end }}
   template:
@@ -44,9 +44,21 @@ spec:
         checksum/config-opensearch: {{ include (print $.Template.BasePath "/opensearch-config.yaml") . | sha256sum }}
         checksum/config-env: {{ include (print $.Template.BasePath "/env.yaml") . | sha256sum }}
     spec:
+      {{- if or .Values.global.imagePullSecrets .Values.opensearch.image.pullSecrets }}
+      imagePullSecrets:
+        {{- with .Values.global.imagePullSecrets }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.opensearch.image.pullSecrets }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
       initContainers:
       - name: fix-data-volume-permissions
-        image: alpine
+        image: {{ include "ragflow.imageRepo" (dict "root" . "repo" .Values.opensearch.initContainers.alpine.repository) }}:{{ .Values.opensearch.initContainers.alpine.tag }}
+        {{- with .Values.opensearch.initContainers.alpine.pullPolicy }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         command:
         - sh
         - -c
@@ -55,14 +67,20 @@ spec:
           - mountPath: /usr/share/opensearch/data
             name: opensearch-data
       - name: sysctl
-        image: busybox
+        image: {{ include "ragflow.imageRepo" (dict "root" . "repo" .Values.opensearch.initContainers.busybox.repository) }}:{{ .Values.opensearch.initContainers.busybox.tag }}
+        {{- with .Values.opensearch.initContainers.busybox.pullPolicy }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         securityContext:
           privileged: true
           runAsUser: 0
         command: ["sysctl", "-w", "vm.max_map_count=262144"]
       containers:
       - name: opensearch
-        image: {{ .Values.opensearch.image.repository }}:{{ .Values.opensearch.image.tag }}
+        image: {{ include "ragflow.imageRepo" (dict "root" . "repo" .Values.opensearch.image.repository) }}:{{ .Values.opensearch.image.tag }}
+        {{- with .Values.opensearch.image.pullPolicy }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         envFrom:
           - secretRef:
               name: {{ include "ragflow.fullname" . }}-env-config

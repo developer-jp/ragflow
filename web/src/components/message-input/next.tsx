@@ -14,9 +14,13 @@ import {
 } from '@/components/file-upload';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
+import { t } from 'i18next';
 import { CircleStop, Paperclip, Send, Upload, X } from 'lucide-react';
 import * as React from 'react';
+import { useEffect } from 'react';
 import { toast } from 'sonner';
+import { AudioButton } from '../ui/audio-button';
 
 interface IProps {
   disabled: boolean;
@@ -33,6 +37,7 @@ interface IProps {
   createConversationBeforeUploadDocument?(message: string): Promise<any>;
   stopOutputMessage?(): void;
   onUpload?: NonNullable<FileUploadProps['onUpload']>;
+  removeFile?(file: File): void;
 }
 
 export function NextMessageInput({
@@ -46,8 +51,25 @@ export function NextMessageInput({
   onInputChange,
   stopOutputMessage,
   onPressEnter,
+  removeFile,
 }: IProps) {
   const [files, setFiles] = React.useState<File[]>([]);
+  const [audioInputValue, setAudioInputValue] = React.useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (audioInputValue !== null) {
+      onInputChange({
+        target: { value: audioInputValue },
+      } as React.ChangeEvent<HTMLTextAreaElement>);
+
+      setTimeout(() => {
+        onPressEnter();
+        setAudioInputValue(null);
+      }, 0);
+    }
+  }, [audioInputValue, onInputChange, onPressEnter]);
 
   const onFileReject = React.useCallback((file: File, message: string) => {
     toast(message, {
@@ -74,6 +96,13 @@ export function NextMessageInput({
       submit();
     },
     [submit],
+  );
+
+  const handleRemoveFile = React.useCallback(
+    (file: File) => () => {
+      removeFile?.(file);
+    },
+    [removeFile],
   );
 
   return (
@@ -120,6 +149,7 @@ export function NextMessageInput({
                   variant="secondary"
                   size="icon"
                   className="-top-1 -right-1 absolute size-4 shrink-0 cursor-pointer rounded-full"
+                  onClick={handleRemoveFile(file)}
                 >
                   <X className="size-2.5" />
                 </Button>
@@ -130,12 +160,16 @@ export function NextMessageInput({
         <Textarea
           value={value}
           onChange={onInputChange}
-          placeholder="Type your message here..."
+          placeholder={t('chat.messagePlaceholder')}
           className="field-sizing-content min-h-10 w-full resize-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 dark:bg-transparent"
           disabled={isUploading || disabled || sendLoading}
           onKeyDown={handleKeyDown}
         />
-        <div className="flex items-center justify-between gap-1.5">
+        <div
+          className={cn('flex items-center justify-between gap-1.5', {
+            'justify-end': !showUploadIcon,
+          })}
+        >
           {showUploadIcon && (
             <FileUploadTrigger asChild>
               <Button
@@ -155,15 +189,24 @@ export function NextMessageInput({
               <CircleStop />
             </Button>
           ) : (
-            <Button
-              className="size-5 rounded-sm"
-              disabled={
-                sendDisabled || isUploading || sendLoading || !value.trim()
-              }
-            >
-              <Send />
-              <span className="sr-only">Send message</span>
-            </Button>
+            <div className="flex items-center gap-3">
+              {/* <div className="bg-bg-input rounded-md hover:bg-bg-card p-1"> */}
+              <AudioButton
+                onOk={(value) => {
+                  setAudioInputValue(value);
+                }}
+              />
+              {/* </div> */}
+              <Button
+                className="size-5 rounded-sm"
+                disabled={
+                  sendDisabled || isUploading || sendLoading || !value.trim()
+                }
+              >
+                <Send />
+                <span className="sr-only">Send message</span>
+              </Button>
+            </div>
           )}
         </div>
       </form>

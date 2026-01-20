@@ -1,11 +1,11 @@
 import { Card, CardContent } from '@/components/ui/card';
+import { SwitchOperatorOptions } from '@/constants/agent';
+import { LogicalOperatorIcon } from '@/hooks/logic-hooks/use-build-operator-options';
 import { ISwitchCondition, ISwitchNode } from '@/interfaces/database/flow';
 import { NodeProps, Position } from '@xyflow/react';
 import { memo, useCallback } from 'react';
-import { NodeHandleId, SwitchOperatorOptions } from '../../constant';
-import { LogicalOperatorIcon } from '../../form/switch-form';
-import { useGetVariableLabelByValue } from '../../hooks/use-get-begin-query';
-import { CommonHandle } from './handle';
+import { useGetVariableLabelOrTypeByValue } from '../../hooks/use-get-begin-query';
+import { CommonHandle, LeftEndHandle } from './handle';
 import { RightHandleStyle } from './handle-icon';
 import NodeHeader from './node-header';
 import { NodeWrapper } from './node-wrapper';
@@ -27,7 +27,7 @@ const ConditionBlock = ({
   nodeId,
 }: { condition: ISwitchCondition } & { nodeId: string }) => {
   const items = condition?.items ?? [];
-  const getLabel = useGetVariableLabelByValue(nodeId);
+  const { getLabel } = useGetVariableLabelOrTypeByValue({ nodeId });
 
   const renderOperatorIcon = useCallback((operator?: string) => {
     const item = SwitchOperatorOptions.find((x) => x.value === operator);
@@ -43,12 +43,12 @@ const ConditionBlock = ({
   }, []);
 
   return (
-    <Card>
+    <Card className="bg-bg-card border-transparent rounded-md">
       <CardContent className="p-0 divide-y divide-background-card">
         {items.map((x, idx) => (
           <div key={idx}>
             <section className="flex justify-between gap-2 items-center text-xs p-1">
-              <div className="flex-1 truncate text-background-checked">
+              <div className="flex-1 truncate text-accent-primary">
                 {getLabel(x?.cpn_id)}
               </div>
               <span>{renderOperatorIcon(x?.operator)}</span>
@@ -65,14 +65,8 @@ function InnerSwitchNode({ id, data, selected }: NodeProps<ISwitchNode>) {
   const { positions } = useBuildSwitchHandlePositions({ data, id });
   return (
     <ToolBar selected={selected} id={id} label={data.label} showRun={false}>
-      <NodeWrapper selected={selected}>
-        <CommonHandle
-          type="target"
-          position={Position.Left}
-          isConnectable
-          nodeId={id}
-          id={NodeHandleId.End}
-        ></CommonHandle>
+      <NodeWrapper selected={selected} id={id}>
+        <LeftEndHandle></LeftEndHandle>
         <NodeHeader id={id} name={data.name} label={data.label}></NodeHeader>
         <section className="gap-2.5 flex flex-col">
           {positions.map((position, idx) => {
@@ -81,11 +75,11 @@ function InnerSwitchNode({ id, data, selected }: NodeProps<ISwitchNode>) {
                 <section className="flex flex-col text-xs">
                   <div className="text-right">
                     <span>{getConditionKey(idx, positions.length)}</span>
-                    <div className="text-text-sub-title">
+                    <div className="text-text-secondary">
                       {idx < positions.length - 1 && position.text}
                     </div>
                   </div>
-                  <span className="text-background-checked">
+                  <span className="text-accent-primary">
                     {idx < positions.length - 1 &&
                       position.condition?.logical_operator?.toUpperCase()}
                   </span>

@@ -1,28 +1,33 @@
 # Copyright (c) 2024 Microsoft Corporation.
 # Licensed under the MIT License
+
+from common.misc_utils import thread_pool_exec
+
 """
 Reference:
  - [graphrag](https://github.com/microsoft/graphrag)
 """
 
+import asyncio
 import logging
 import json
+import os
 import re
 from typing import Callable
 from dataclasses import dataclass
 import networkx as nx
 import pandas as pd
 
-from api.utils.api_utils import timeout
+from api.db.services.task_service import has_canceled
+from common.exceptions import TaskCanceledException
+from common.connection_utils import timeout
 from graphrag.general import leiden
 from graphrag.general.community_report_prompt import COMMUNITY_REPORT_PROMPT
 from graphrag.general.extractor import Extractor
 from graphrag.general.leiden import add_community_info2graph
 from rag.llm.chat_model import Base as CompletionLLM
 from graphrag.utils import perform_variable_replacements, dict_has_keys_with_types, chat_limiter
-from rag.utils import num_tokens_from_string
-import trio
-
+from common.token_utils import num_tokens_from_string
 
 @dataclass
 class CommunityReportsResult:
@@ -50,7 +55,8 @@ class CommunityReportsExtractor(Extractor):
         self._extraction_prompt = COMMUNITY_REPORT_PROMPT
         self._max_report_length = max_report_length or 1500
 
-    async def __call__(self, graph: nx.Graph, callback: Callable | None = None):
+    async def __call__(self, graph: nx.Graph, callback: Callable | None = None, task_id: str = ""):
+        enable_timeout_assertion = os.environ.get("ENABLE_TIMEOUT_ASSERTION")
         for node_degree in graph.degree:
             graph.nodes[str(node_degree[0])]["rank"] = int(node_degree[1])
 
@@ -62,6 +68,11 @@ class CommunityReportsExtractor(Extractor):
         @timeout(120)
         async def extract_community_report(community):
             nonlocal res_str, res_dict, over, token_count
+            if task_id:
+                if has_canceled(task_id):
+                    logging.info(f"Task {task_id} cancelled during community report extraction.")
+                    raise TaskCanceledException(f"Task {task_id} was cancelled")
+
             cm_id, cm = community
             weight = cm["weight"]
             ents = cm["nodes"]
@@ -92,11 +103,11 @@ class CommunityReportsExtractor(Extractor):
             text = perform_variable_replacements(self._extraction_prompt, variables=prompt_variables)
             async with chat_limiter:
                 try:
-                    with trio.move_on_after(80) as cancel_scope:
-                        response = await trio.to_thread.run_sync( self._chat, text, [{"role": "user", "content": "Output:"}], {})
-                    if cancel_scope.cancelled_caught:
-                        logging.warning("extract_community_report._chat timeout, skipping...")
-                        return
+                    timeout = 180 if enable_timeout_assertion else 1000000000
+                    response = await asyncio.wait_for(thread_pool_exec(self._chat,text,[{"role": "user", "content": "Output:"}],{},task_id),timeout=timeout)
+                except asyncio.TimeoutError:
+                    logging.warning("extract_community_report._chat timeout, skipping...")
+                    return
                 except Exception as e:
                     logging.error(f"extract_community_report._chat failed: {e}")
                     return
@@ -129,14 +140,25 @@ class CommunityReportsExtractor(Extractor):
             if callback:
                 callback(msg=f"Communities: {over}/{total}, used tokens: {token_count}")
 
-        st = trio.current_time()
-        async with trio.open_nursery() as nursery:
-            for level, comm in communities.items():
-                logging.info(f"Level {level}: Community: {len(comm.keys())}")
-                for community in comm.items():
-                    nursery.start_soon(extract_community_report, community)
+        st = asyncio.get_running_loop().time()
+        tasks = []
+        for level, comm in communities.items():
+            logging.info(f"Level {level}: Community: {len(comm.keys())}")
+            for community in comm.items():
+                if task_id and has_canceled(task_id):
+                    logging.info(f"Task {task_id} cancelled before community processing.")
+                    raise TaskCanceledException(f"Task {task_id} was cancelled")
+                tasks.append(asyncio.create_task(extract_community_report(community)))
+        try:
+            await asyncio.gather(*tasks, return_exceptions=False)
+        except Exception as e:
+            logging.error(f"Error in community processing: {e}")
+            for t in tasks:
+                t.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            raise
         if callback:
-            callback(msg=f"Community reports done in {trio.current_time() - st:.2f}s, used tokens: {token_count}")
+            callback(msg=f"Community reports done in {asyncio.get_running_loop().time() - st:.2f}s, used tokens: {token_count}")
 
         return CommunityReportsResult(
             structured_output=res_dict,

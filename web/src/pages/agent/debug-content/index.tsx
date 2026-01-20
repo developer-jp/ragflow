@@ -1,3 +1,4 @@
+import MarkdownContent from '@/components/next-markdown-content';
 import { ButtonLoading } from '@/components/ui/button';
 import {
   Form,
@@ -11,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { RAGFlowSelect } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { IMessage } from '@/interfaces/database/chat';
 import { zodResolver } from '@hookform/resolvers/zod';
 import React, { ReactNode, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
@@ -28,6 +30,7 @@ const StringFields = [
 
 interface IProps {
   parameters: BeginQuery[];
+  message?: IMessage;
   ok(parameters: any[]): void;
   isNext?: boolean;
   loading?: boolean;
@@ -37,6 +40,7 @@ interface IProps {
 
 const DebugContent = ({
   parameters,
+  message,
   ok,
   isNext = true,
   loading = false,
@@ -228,10 +232,17 @@ const DebugContent = ({
     },
     [formSchemaValues, ok, parameters],
   );
-
   return (
     <>
       <section>
+        {message?.data?.tips && (
+          <div className="mb-2">
+            <MarkdownContent
+              content={message?.data?.tips}
+              loading={false}
+            ></MarkdownContent>
+          </div>
+        )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {parameters.map((x, idx) => {
@@ -242,7 +253,7 @@ const DebugContent = ({
                 type="submit"
                 loading={loading}
                 disabled={!submittable || submitButtonDisabled}
-                className="w-full mt-8"
+                className="w-full mt-1"
               >
                 {btnText || t(isNext ? 'common.next' : 'flow.run')}
               </ButtonLoading>

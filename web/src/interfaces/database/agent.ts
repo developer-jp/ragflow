@@ -30,6 +30,7 @@ export interface ISwitchForm {
   no: string;
 }
 
+import { AgentCategory } from '@/constants/agent';
 import { Edge, Node } from '@xyflow/react';
 import { IReference, Message } from './chat';
 
@@ -38,12 +39,13 @@ export type DSLComponents = Record<string, IOperator>;
 export interface DSL {
   components: DSLComponents;
   history: any[];
-  path?: string[][];
+  path?: string[];
   answer?: any[];
   graph?: IGraph;
-  messages: Message[];
-  reference: IReference[];
+  messages?: Message[];
+  reference?: IReference[];
   globals: Record<string, any>;
+  variables: Record<string, GlobalVariableType>;
   retrieval: IReference[];
 }
 
@@ -73,6 +75,8 @@ export declare interface IFlow {
   user_id: string;
   permission: string;
   nickname: string;
+  operator_permission: number;
+  canvas_category: string;
 }
 
 export interface IFlowTemplate {
@@ -80,12 +84,19 @@ export interface IFlowTemplate {
   canvas_type: string;
   create_date: string;
   create_time: number;
-  description: string;
+  canvas_category?: string;
   dsl: DSL;
   id: string;
-  title: string;
   update_date: string;
   update_time: number;
+  description: {
+    en: string;
+    zh: string;
+  };
+  title: {
+    en: string;
+    zh: string;
+  };
 }
 
 export interface IGenerateForm {
@@ -159,6 +170,7 @@ export interface IAgentForm {
   tools: Array<{
     name: string;
     component_name: string;
+    id: string;
     params: Record<string, any>;
   }>;
   mcp: Array<{
@@ -263,4 +275,27 @@ export interface IAgentLogMessage {
   content: string;
   role: 'user' | 'assistant';
   id: string;
+}
+
+export interface IPipeLineListRequest {
+  page?: number;
+  page_size?: number;
+  keywords?: string;
+  orderby?: string;
+  desc?: boolean;
+  canvas_category?: AgentCategory;
+}
+
+export interface GlobalVariableType {
+  name: string;
+  value: any;
+  description: string;
+  type: string;
+}
+
+export interface IWebhookTrace {
+  webhook_id: null;
+  events: any[];
+  next_since_ts: number;
+  finished: boolean;
 }

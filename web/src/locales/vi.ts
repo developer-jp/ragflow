@@ -182,6 +182,9 @@ export default {
       documentMetaTips: `<p>Dữ liệu meta ở định dạng Json (không thể tìm kiếm). Nó sẽ được thêm vào prompt cho LLM nếu bất kỳ đoạn nào của tài liệu này được đưa vào prompt.</p> <p>Ví dụ:</p> <b>Dữ liệu meta là:</b><br> <code> { "Author": "Alex Dowson", "Date": "2024-11-12" } </code><br><b>Prompt sẽ là:</b><br> <p>Tài liệu: the_name_of_document</p> <p>Tác giả: Alex Dowson</p> <p>Ngày: 2024-11-12</p> <p>Các đoạn liên quan như sau:</p> <ul> <li> Đây là nội dung của đoạn...</li> <li> Đây là nội dung của đoạn...</li> </ul>`,
     },
     knowledgeConfiguration: {
+      imageTableContextWindow: 'Cửa sổ ngữ cảnh hình ảnh & bảng',
+      imageTableContextWindowTip:
+        'Trích xuất N token văn bản phía trên và phía dưới hình ảnh và bảng để cung cấp bối cảnh phong phú hơn.',
       titleDescription:
         'Cập nhật cấu hình cơ sở kiến thức của bạn tại đây, đặc biệt là phương thức phân khối.',
       name: 'Tên cơ sở kiến thức',
@@ -195,7 +198,7 @@ export default {
       chunkTokenNumber: 'Kích thước khối được khuyến nghị',
       chunkTokenNumberMessage: 'Số token khối là bắt buộc',
       embeddingModelTip:
-        'Mô hình nhúng mặc định của cơ sở tri thức. Không thể thay đổi khi cơ sở tri thức đã có các đoạn dữ liệu. Để chuyển sang mô hình nhúng mặc định khác, bạn phải xóa tất cả các đoạn dữ liệu hiện có trong cơ sở tri thức.',
+        'Mô hình nhúng mặc định của cơ sở tri thức. Khi cơ sở tri thức đã có các đoạn (chunk), lúc thay đổi mô hình nhúng, hệ thống sẽ lấy ngẫu nhiên một số chunk để kiểm tra tương thích, mã hóa lại bằng mô hình nhúng mới và tính độ tương đồng cosine giữa vector mới và vector cũ. Chỉ cho phép chuyển khi độ tương đồng trung bình của mẫu ≥ 0.9. Nếu không, bạn phải xóa tất cả các chunk trong cơ sở tri thức trước khi có thể thay đổi.',
       permissionsTip:
         'Nếu được đặt thành "Đội", tất cả các thành viên trong nhóm sẽ có thể quản lý cơ sở kiến thức.',
       chunkTokenNumberTip:
@@ -220,7 +223,7 @@ export default {
       book: `<p>Các định dạng tệp được hỗ trợ là <b>DOCX</b>, <b>PDF</b>, <b>TXT</b>.</p><p>
       Đối với mỗi sách trong PDF, vui lòng đặt <i>phạm vi trang</i> để loại bỏ thông tin không mong muốn và giảm thời gian phân tích.</p>`,
       laws: `<p>Các định dạng tệp được hỗ trợ là <b>DOCX</b>, <b>PDF</b>, <b>TXT</b>.</p><p>
-      Các tài liệu pháp lý thường tuân theo định dạng viết nghiêm ngặt. Chúng tôi sử dụng tính năng văn bản để xác định điểm phân chia. 
+      Các tài liệu pháp lý thường tuân theo định dạng viết nghiêm ngặt. Chúng tôi sử dụng tính năng văn bản để xác định điểm phân chia.
       </p><p>
       Khối có độ chi tiết nhất quán với 'ARTICLE', đảm bảo tất cả văn bản cấp trên được bao gồm trong khối.
       </p>`,
@@ -234,7 +237,7 @@ export default {
       <p>Các định dạng tệp được hỗ trợ là <b>MD, MDX, DOCX, XLSX, XLS (Excel 97-2003), PPT, PDF, TXT, JPEG, JPG, PNG, TIF, GIF, CSV, JSON, EML, HTML</b>.</p>`,
       paper: `<p>Chỉ hỗ trợ tệp <b>PDF</b>.</p><p>
       Bài báo sẽ được chia theo các phần, chẳng hạn như <i>tóm tắt, 1.1, 1.2</i>. </p><p>
-      Cách tiếp cận này cho phép LLM tóm tắt bài báo hiệu quả hơn và cung cấp các phản hồi toàn diện, dễ hiểu hơn. 
+      Cách tiếp cận này cho phép LLM tóm tắt bài báo hiệu quả hơn và cung cấp các phản hồi toàn diện, dễ hiểu hơn.
       Tuy nhiên, nó cũng làm tăng ngữ cảnh cho các cuộc hội thoại AI và tăng thêm chi phí tính toán cho LLM. Vì vậy, trong quá trình trò chuyện, hãy cân nhắc giảm giá trị của '<b>topN</b>'.</p>`,
       presentation: `<p>Các định dạng tệp được hỗ trợ là <b>PDF</b>, <b>PPTX</b>.</p><p>
       Mỗi trang trong slide được coi là một khối, với hình thu nhỏ của nó được lưu trữ.</p><p>
@@ -290,7 +293,7 @@ export default {
       Áp dụng khi bạn yêu cầu LLM tóm tắt toàn bộ tài liệu, với điều kiện nó có thể xử lý được lượng ngữ cảnh đó.
       </p>`,
       knowledgeGraph: `<p>Các định dạng tệp được hỗ trợ là <b>DOCX, EXCEL, PPT, IMAGE, PDF, TXT, MD, JSON, EML</b>
-             
+
       <p>Cách tiếp cận này phân đoạn tệp bằng phương pháp 'ngây thơ'/'Tổng hợp'. Nó chia tài liệu thành các phân đoạn và sau đó kết hợp các phân đoạn liền kề cho đến khi số lượng token vượt quá ngưỡng được chỉ định bởi 'Số token khối', tại thời điểm đó, một khối được tạo.</p>
       <p>Các khối sau đó được đưa vào LLM để trích xuất các thực thể và mối quan hệ cho biểu đồ tri thức và sơ đồ tư duy.</p>
       <p>Đảm bảo bạn đã đặt <b>Loại thực thể</b>.</p>`,
@@ -351,6 +354,17 @@ export default {
       community: 'Xây dựng mối quan hệ cộng đồng',
       communityTip:
         'Các liên kết được nhóm lại thành các cộng đồng phân cấp, với các thực thể và mối quan hệ kết nối từng phân đoạn lên các cấp độ trừu tượng cao hơn. Sau đó, chúng tôi sử dụng một LLM để tạo ra bản tóm tắt cho mỗi cộng đồng, được gọi là báo cáo cộng đồng. Xem thêm: https://www.microsoft.com/en-us/research/blog/graphrag-improving-global-search-via-dynamic-community-selection/',
+      paddleocrOptions: 'Tùy chọn PaddleOCR',
+      paddleocrApiUrl: 'URL API PaddleOCR',
+      paddleocrApiUrlTip: 'URL điểm cuối API của dịch vụ PaddleOCR',
+      paddleocrApiUrlPlaceholder: 'Ví dụ: https://paddleocr-server.com/layout-parsing',
+      paddleocrAccessToken: 'Token truy cập AI Studio',
+      paddleocrAccessTokenTip: 'Token truy cập cho API PaddleOCR (tùy chọn)',
+      paddleocrAccessTokenPlaceholder: 'Token AI Studio của bạn (tùy chọn)',
+      paddleocrAlgorithm: 'Thuật toán PaddleOCR',
+      paddleocrAlgorithmTip: 'Thuật toán được sử dụng để xử lý PaddleOCR',
+      paddleocrSelectAlgorithm: 'Chọn thuật toán',
+      paddleocrModelNamePlaceholder: 'Ví dụ: paddleocr-môi-trường-1',
     },
     chunk: {
       chunk: 'Khối',
@@ -558,6 +572,10 @@ export default {
       baseUrl: 'Base-Url',
       baseUrlTip:
         'Nếu khóa API của bạn từ OpenAI, chỉ cần bỏ qua nó. Bất kỳ nhà cung cấp trung gian nào khác sẽ cung cấp URL cơ sở này với khóa API.',
+      minimaxBaseUrlTip:
+        'Chỉ người dùng quốc tế: dùng https://api.minimax.io/v1.',
+      minimaxBaseUrlPlaceholder:
+        '(Chỉ dành cho người dùng quốc tế, điền https://api.minimax.io/v1)',
       modify: 'Sửa đổi',
       systemModelSettings: 'Đặt mô hình mặc định',
       chatModel: 'Mô hình trò chuyện',
@@ -588,6 +606,17 @@ export default {
       modelTypeMessage: 'Vui lòng nhập loại mô hình của bạn!',
       addLlmBaseUrl: 'URL cơ sở',
       baseUrlNameMessage: 'Vui lòng nhập URL cơ sở của bạn!',
+      paddleocr: {
+        apiUrl: 'URL API PaddleOCR',
+        apiUrlPlaceholder: 'Ví dụ: https://paddleocr-server.com/layout-parsing',
+        accessToken: 'Token truy cập AI Studio',
+        accessTokenPlaceholder: 'Token AI Studio của bạn (tùy chọn)',
+        algorithm: 'Thuật toán PaddleOCR',
+        selectAlgorithm: 'Chọn thuật toán',
+        modelNamePlaceholder: 'Ví dụ: paddleocr-from-env-1',
+        modelNameRequired: 'Tên mô hình là bắt buộc',
+        apiUrlRequired: 'URL API PaddleOCR là bắt buộc'
+      },
       vision: 'Có hỗ trợ Tầm nhìn không?',
       ollamaLink: 'Cách tích hợp {{name}}',
       FishAudioLink: 'Cách sử dụng FishAudio',
@@ -603,13 +632,41 @@ export default {
       bedrockSKMessage: 'Vui lòng nhập KHÓA BÍ MẬT của bạn',
       bedrockRegion: 'Vùng AWS',
       bedrockRegionMessage: 'Vui lòng chọn!',
+      'us-east-2': 'US East (Ohio)',
       'us-east-1': 'US East (N. Virginia)',
+      'us-west-1': 'US West (N. California)',
       'us-west-2': 'US West (Oregon)',
+      'af-south-1': 'Africa (Cape Town)',
+      'ap-east-1': 'Asia Pacific (Hong Kong)',
+      'ap-south-2': 'Asia Pacific (Hyderabad)',
+      'ap-southeast-3': 'Asia Pacific (Jakarta)',
+      'ap-southeast-5': 'Asia Pacific (Malaysia)',
+      'ap-southeast-4': 'Asia Pacific (Melbourne)',
+      'ap-south-1': 'Asia Pacific (Mumbai)',
+      'ap-northeast-3': 'Asia Pacific (Osaka)',
+      'ap-northeast-2': 'Asia Pacific (Seoul)',
       'ap-southeast-1': 'Asia Pacific (Singapore)',
-      'ap-northeast-1': 'Asia Pacific (Tokyo)',
-      'eu-central-1': 'Europe (Frankfurt)',
-      'us-gov-west-1': 'AWS GovCloud (US-West)',
       'ap-southeast-2': 'Asia Pacific (Sydney)',
+      'ap-east-2': 'Asia Pacific (Taipei)',
+      'ap-southeast-7': 'Asia Pacific (Thailand)',
+      'ap-northeast-1': 'Asia Pacific (Tokyo)',
+      'ca-central-1': 'Canada (Central)',
+      'ca-west-1': 'Canada West (Calgary)',
+      'eu-central-1': 'Europe (Frankfurt)',
+      'eu-west-1': 'Europe (Ireland)',
+      'eu-west-2': 'Europe (London)',
+      'eu-south-1': 'Europe (Milan)',
+      'eu-west-3': 'Europe (Paris)',
+      'eu-south-2': 'Europe (Spain)',
+      'eu-north-1': 'Europe (Stockholm)',
+      'eu-central-2': 'Europe (Zurich)',
+      'il-central-1': 'Israel (Tel Aviv)',
+      'mx-central-1': 'Mexico (Central)',
+      'me-south-1': 'Middle East (Bahrain)',
+      'me-central-1': 'Middle East (UAE)',
+      'sa-east-1': 'South America (São Paulo)',
+      'us-gov-east-1': 'AWS GovCloud (US-East)',
+      'us-gov-west-1': 'AWS GovCloud (US-West)',
       addHunyuanSID: 'Hunyuan Secret ID',
       HunyuanSIDMessage: 'Vui lòng nhập ID bí mật của bạn',
       addHunyuanSK: 'Hunyuan Secret Key',
@@ -789,12 +846,31 @@ export default {
       baiduDescription: `Thành phần này được sử dụng để lấy kết quả tìm kiếm từ www.baidu.com. Thông thường, nó hoạt động như một phần bổ sung cho các cơ sở kiến thức. Top N chỉ định số lượng kết quả tìm kiếm bạn cần điều chỉnh.`,
       duckDuckGo: 'DuckDuckGo',
       duckDuckGoDescription:
-        'Một thành phần truy xuất kết quả tìm kiếm từ duckduckgo.com, với TopN xác định số lượng kết quả tìm kiếm. Nó bổ sung cho các cơ sở kiến thức hiện có.',
-      channel: 'Kênh',
-      channelTip: `Thực hiện tìm kiếm văn bản hoặc tìm kiếm tin tức trên đầu vào của thành phần`,
-      text: 'Văn bản',
-      news: 'Tin tức',
-      messageHistoryWindowSize: 'Cửa sổ lịch sử tin nhắn',
+        'Một thành phần tìm kiếm trên duckduckgo.com, cho phép bạn chỉ định số lượng kết quả tìm kiếm sử dụng TopN. Nó bổ sung cho các cơ sở kiến thức hiện có.',
+      searXNG: 'SearXNG',
+      searXNGDescription:
+        'Một thành phần tìm kiếm thông qua URL phiên bản SearXNG bạn cung cấp. Chỉ định TopN và URL phiên bản.',
+      pdfGenerator: 'Trình tạo Tài liệu',
+      pDFGenerator: 'Trình tạo Tài liệu',
+      pdfGeneratorDescription: `Một thành phần tạo tài liệu (PDF, DOCX, TXT) từ nội dung định dạng markdown với kiểu tùy chỉnh, hình ảnh và bảng. Hỗ trợ: **in đậm**, *in nghiêng*, # tiêu đề, - danh sách, bảng với cú pháp |.`,
+      pDFGeneratorDescription: `Một thành phần tạo tài liệu (PDF, DOCX, TXT) từ nội dung định dạng markdown với kiểu tùy chỉnh, hình ảnh và bảng. Hỗ trợ: **in đậm**, *in nghiêng*, # tiêu đề, - danh sách, bảng với cú pháp |.`,
+      subtitle: 'Phụ đề',
+      logoImage: 'Hình ảnh Logo',
+      logoPosition: 'Vị trí Logo',
+      logoWidth: 'Chiều rộng Logo',
+      logoHeight: 'Chiều cao Logo',
+      fontFamily: 'Họ phông chữ',
+      fontSize: 'Kích thước phông chữ',
+      titleFontSize: 'Kích thước phông chữ tiêu đề',
+      pageSize: 'Kích thước trang',
+      orientation: 'Hướng',
+      marginTop: 'Lề trên',
+      marginBottom: 'Lề dưới',
+      filename: 'Tên tệp',
+      outputDirectory: 'Thư mục đầu ra',
+      addPageNumbers: 'Thêm số trang',
+      addTimestamp: 'Thêm dấu thời gian',
+      watermarkText: 'Văn bản watermark',
       messageHistoryWindowSizeTip:
         'Kích thước cửa sổ lịch sử cuộc trò chuyện hiển thị với LLM. Càng lớn càng tốt, nhưng hãy chú ý đến giới hạn tối đa số token của LLM.',
       wikipedia: 'Wikipedia',
@@ -1097,6 +1173,8 @@ export default {
       cleanHtml: 'Làm sạch HTML',
       cleanHtmlTip:
         'Nếu phản hồi được định dạng HTML và chỉ muốn nội dung chính, hãy bật nó lên.',
+      invalidUrl:
+        'Phải là URL hợp lệ hoặc URL có chứa các biến theo định dạng {ten_bien} hoặc {thanh_phan@bien}',
       reference: 'Tham khảo',
       input: 'Đầu vào',
       output: 'Đầu ra',

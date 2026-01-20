@@ -1,12 +1,15 @@
 import MessageItem from '@/components/next-message-item';
-import { Modal } from '@/components/ui/modal';
+import { Modal } from '@/components/ui/modal/modal';
 import { useFetchAgent } from '@/hooks/use-agent-request';
-import { useFetchUserInfo } from '@/hooks/user-setting-hooks';
+import { useFetchUserInfo } from '@/hooks/use-user-setting-request';
 import { IAgentLogMessage } from '@/interfaces/database/agent';
-import { IReferenceObject, Message } from '@/interfaces/database/chat';
+import {
+  IMessage,
+  IReferenceObject,
+  Message,
+} from '@/interfaces/database/chat';
 import { buildMessageUuidWithRole } from '@/utils/chat';
 import React, { useMemo } from 'react';
-import { IMessage } from '../chat/interface';
 
 interface CustomModalProps {
   isOpen: boolean;
@@ -25,21 +28,25 @@ export const AgentLogDetailModal: React.FC<CustomModalProps> = ({
   const { data: canvasInfo } = useFetchAgent();
 
   const shortMessage = useMemo(() => {
-    const content = derivedMessages[0]?.content || '';
+    if (derivedMessages?.length) {
+      const content = derivedMessages[0]?.content || '';
 
-    const chineseCharCount = (content.match(/[\u4e00-\u9fa5]/g) || []).length;
-    const totalLength = content.length;
+      const chineseCharCount = (content.match(/[\u4e00-\u9fa5]/g) || []).length;
+      const totalLength = content.length;
 
-    if (chineseCharCount > 0) {
-      if (totalLength > 15) {
-        return content.substring(0, 15) + '...';
+      if (chineseCharCount > 0) {
+        if (totalLength > 15) {
+          return content.substring(0, 15) + '...';
+        }
+      } else {
+        if (totalLength > 30) {
+          return content.substring(0, 30) + '...';
+        }
       }
+      return content;
     } else {
-      if (totalLength > 30) {
-        return content.substring(0, 30) + '...';
-      }
+      return '';
     }
-    return content;
   }, [derivedMessages]);
 
   return (
@@ -52,7 +59,7 @@ export const AgentLogDetailModal: React.FC<CustomModalProps> = ({
       className="!w-[900px]"
     >
       <div className="flex items-start mb-4 flex-col gap-4 justify-start">
-        <div>
+        <div className="w-full">
           {derivedMessages?.map((message, i) => {
             return (
               <MessageItem

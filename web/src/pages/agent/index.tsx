@@ -1,5 +1,6 @@
+import EmbedDialog from '@/components/embed-dialog';
+import { useShowEmbedModal } from '@/components/embed-dialog/use-show-embed-dialog';
 import { PageHeader } from '@/components/page-header';
-import { useSwitchToDarkThemeOnMount } from '@/components/theme-provider';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -16,6 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import message from '@/components/ui/message';
 import { SharedFrom } from '@/constants/chat';
 import { useSetModalState } from '@/hooks/common-hooks';
 import { useNavigatePage } from '@/hooks/logic-hooks/navigate-hooks';
@@ -23,29 +25,41 @@ import { ReactFlowProvider } from '@xyflow/react';
 import {
   ChevronDown,
   CirclePlay,
-  Download,
   History,
   LaptopMinimalCheck,
   Logs,
+  MessageSquareCode,
   ScreenShare,
+  Settings,
   Upload,
 } from 'lucide-react';
 import { ComponentPropsWithoutRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'umi';
+import { useParams } from 'react-router';
 import AgentCanvas from './canvas';
-import EmbedDialog from './embed-dialog';
-import { useHandleExportOrImportJsonFile } from './hooks/use-export-json';
+import { DropdownProvider } from './canvas/context';
+import { Operator } from './constant';
+import { GlobalParamSheet } from './gobal-variable-sheet';
+import { useCancelCurrentDataflow } from './hooks/use-cancel-dataflow';
+import { useHandleExportJsonFile } from './hooks/use-export-json';
 import { useFetchDataOnMount } from './hooks/use-fetch-data';
+import { useFetchPipelineLog } from './hooks/use-fetch-pipeline-log';
 import { useGetBeginNodeDataInputs } from './hooks/use-get-begin-query';
+import { useIsPipeline } from './hooks/use-is-pipeline';
+import { useIsWebhookMode } from './hooks/use-is-webhook';
+import { useRunDataflow } from './hooks/use-run-dataflow';
 import {
   useSaveGraph,
   useSaveGraphBeforeOpeningDebugDrawer,
   useWatchAgentChange,
 } from './hooks/use-save-graph';
-import { useShowEmbedModal } from './hooks/use-show-dialog';
-import { UploadAgentDialog } from './upload-agent-dialog';
+import { PipelineLogSheet } from './pipeline-log-sheet';
+import PipelineRunSheet from './pipeline-run-sheet';
+import { SettingDialog } from './setting-dialog';
+import useGraphStore from './store';
+import { useAgentHistoryManager } from './use-agent-history-manager';
 import { VersionDialog } from './version-dialog';
+import WebhookSheet from './webhook-sheet';
 
 function AgentDropdownMenuItem({
   children,
@@ -60,22 +74,17 @@ function AgentDropdownMenuItem({
 
 export default function Agent() {
   const { id } = useParams();
-  const { navigateToAgentList } = useNavigatePage();
+  const isPipeline = useIsPipeline();
+  const { navigateToAgents } = useNavigatePage();
   const {
     visible: chatDrawerVisible,
     hideModal: hideChatDrawer,
     showModal: showChatDrawer,
   } = useSetModalState();
   const { t } = useTranslation();
+  useAgentHistoryManager();
 
-  // const openDocument = useOpenDocument();
-  const {
-    handleExportJson,
-    handleImportJson,
-    fileUploadVisible,
-    onFileUploadOk,
-    hideFileUploadModal,
-  } = useHandleExportOrImportJsonFile();
+  const { handleExportJson } = useHandleExportJsonFile();
   const { saveGraph, loading } = useSaveGraph();
   const { flowDetail: agentDetail } = useFetchDataOnMount();
   const inputs = useGetBeginNodeDataInputs();
@@ -93,12 +102,107 @@ export default function Agent() {
     showModal: showVersionDialog,
   } = useSetModalState();
 
+  const {
+    visible: settingDialogVisible,
+    hideModal: hideSettingDialog,
+    showModal: showSettingDialog,
+  } = useSetModalState();
+
   const { showEmbedModal, hideEmbedModal, embedVisible, beta } =
     useShowEmbedModal();
   const { navigateToAgentLogs } = useNavigatePage();
   const time = useWatchAgentChange(chatDrawerVisible);
+  const isWebhookMode = useIsWebhookMode();
 
-  useSwitchToDarkThemeOnMount();
+  // pipeline
+
+  const {
+    visible: pipelineRunSheetVisible,
+    hideModal: hidePipelineRunSheet,
+    showModal: showPipelineRunSheet,
+  } = useSetModalState();
+
+  const {
+    visible: webhookTestSheetVisible,
+    hideModal: hideWebhookTestSheet,
+    showModal: showWebhookTestSheet,
+  } = useSetModalState();
+
+  const {
+    visible: pipelineLogSheetVisible,
+    showModal: showPipelineLogSheet,
+    hideModal: hidePipelineLogSheet,
+  } = useSetModalState();
+
+  const {
+    visible: globalParamSheetVisible,
+    showModal: showGlobalParamSheet,
+    hideModal: hideGlobalParamSheet,
+  } = useSetModalState();
+
+  const {
+    isParsing,
+    logs,
+    messageId,
+    setMessageId,
+    isCompleted,
+    stopFetchTrace,
+    isLogEmpty,
+  } = useFetchPipelineLog(pipelineLogSheetVisible);
+
+  const findNodeByName = useGraphStore((state) => state.findNodeByName);
+
+  const handleRunPipeline = useCallback(() => {
+    if (!findNodeByName(Operator.Tokenizer)) {
+      message.warning(t('flow.tokenizerRequired'));
+      return;
+    }
+
+    if (isParsing) {
+      // show log sheet
+      showPipelineLogSheet();
+    } else {
+      hidePipelineLogSheet();
+      // handleRun();
+      showPipelineRunSheet();
+    }
+  }, [
+    findNodeByName,
+    hidePipelineLogSheet,
+    isParsing,
+    showPipelineLogSheet,
+    showPipelineRunSheet,
+    t,
+  ]);
+
+  const { handleCancel } = useCancelCurrentDataflow({
+    messageId,
+    stopFetchTrace,
+  });
+
+  const handleButtonRunClick = useCallback(() => {
+    if (isWebhookMode) {
+      saveGraph();
+      showWebhookTestSheet();
+    } else if (isPipeline) {
+      handleRunPipeline();
+    } else {
+      handleRunAgent();
+    }
+  }, [
+    handleRunAgent,
+    handleRunPipeline,
+    isPipeline,
+    isWebhookMode,
+    saveGraph,
+    showWebhookTestSheet,
+  ]);
+
+  const {
+    run: runPipeline,
+    loading: pipelineRunning,
+    uploadedFileData,
+  } = useRunDataflow({ showLogSheet: showPipelineLogSheet, setMessageId });
 
   return (
     <section className="h-full">
@@ -107,8 +211,8 @@ export default function Agent() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink onClick={navigateToAgentList}>
-                  Agent
+                <BreadcrumbLink onClick={navigateToAgents}>
+                  {t('header.flow')}
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
@@ -117,7 +221,7 @@ export default function Agent() {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-          <div className="text-xs text-text-sub-title translate-y-3">
+          <div className="text-xs text-text-secondary translate-y-3">
             {t('flow.autosaved')} {time}
           </div>
         </section>
@@ -129,22 +233,30 @@ export default function Agent() {
           >
             <LaptopMinimalCheck /> {t('flow.save')}
           </ButtonLoading>
-          <Button variant={'secondary'} onClick={handleRunAgent}>
+          <ButtonLoading
+            variant={'secondary'}
+            onClick={() => showGlobalParamSheet()}
+            loading={loading}
+          >
+            <MessageSquareCode /> {t('flow.conversationVariable')}
+          </ButtonLoading>
+          <Button variant={'secondary'} onClick={handleButtonRunClick}>
             <CirclePlay />
             {t('flow.run')}
           </Button>
           <Button variant={'secondary'} onClick={showVersionDialog}>
             <History />
-            {t('flow.historyversion')}
+            {t('flow.historyVersion')}
           </Button>
-          <Button
-            variant={'secondary'}
-            onClick={navigateToAgentLogs(id as string)}
-          >
-            <Logs />
-            {t('flow.log')}
-          </Button>
-
+          {isPipeline || (
+            <Button
+              variant={'secondary'}
+              onClick={navigateToAgentLogs(id as string)}
+            >
+              <Logs />
+              {t('flow.log')}
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant={'secondary'}>
@@ -152,45 +264,37 @@ export default function Agent() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              {/* <AgentDropdownMenuItem onClick={openDocument}>
-                <Key />
-                API
-              </AgentDropdownMenuItem> */}
-              {/* <DropdownMenuSeparator /> */}
-              <AgentDropdownMenuItem onClick={handleImportJson}>
-                <Download />
-                {t('flow.import')}
-              </AgentDropdownMenuItem>
-              <DropdownMenuSeparator />
               <AgentDropdownMenuItem onClick={handleExportJson}>
                 <Upload />
                 {t('flow.export')}
               </AgentDropdownMenuItem>
-              {location.hostname !== 'demo.ragflow.io' && (
-                <>
-                  <DropdownMenuSeparator />
-                  <AgentDropdownMenuItem onClick={showEmbedModal}>
-                    <ScreenShare />
-                    {t('common.embedIntoSite')}
-                  </AgentDropdownMenuItem>
-                </>
-              )}
+              <DropdownMenuSeparator />
+              <AgentDropdownMenuItem onClick={showSettingDialog}>
+                <Settings />
+                {t('flow.setting')}
+              </AgentDropdownMenuItem>
+              {isPipeline ||
+                (location.hostname !== 'demo.ragflow.io' && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <AgentDropdownMenuItem onClick={showEmbedModal}>
+                      <ScreenShare />
+                      {t('common.embedIntoSite')}
+                    </AgentDropdownMenuItem>
+                  </>
+                ))}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </PageHeader>
       <ReactFlowProvider>
-        <AgentCanvas
-          drawerVisible={chatDrawerVisible}
-          hideDrawer={hideChatDrawer}
-        ></AgentCanvas>
+        <DropdownProvider>
+          <AgentCanvas
+            drawerVisible={chatDrawerVisible}
+            hideDrawer={hideChatDrawer}
+          ></AgentCanvas>
+        </DropdownProvider>
       </ReactFlowProvider>
-      {fileUploadVisible && (
-        <UploadAgentDialog
-          hideModal={hideFileUploadModal}
-          onOk={onFileUploadOk}
-        ></UploadAgentDialog>
-      )}
       {embedVisible && (
         <EmbedDialog
           visible={embedVisible}
@@ -202,7 +306,41 @@ export default function Agent() {
         ></EmbedDialog>
       )}
       {versionDialogVisible && (
-        <VersionDialog hideModal={hideVersionDialog}></VersionDialog>
+        <DropdownProvider>
+          <VersionDialog hideModal={hideVersionDialog}></VersionDialog>
+        </DropdownProvider>
+      )}
+      {settingDialogVisible && (
+        <SettingDialog hideModal={hideSettingDialog}></SettingDialog>
+      )}
+
+      {pipelineLogSheetVisible && (
+        <PipelineLogSheet
+          hideModal={hidePipelineLogSheet}
+          isParsing={isParsing}
+          isCompleted={isCompleted}
+          isLogEmpty={isLogEmpty}
+          logs={logs}
+          handleCancel={handleCancel}
+          messageId={messageId}
+          uploadedFileData={uploadedFileData}
+        ></PipelineLogSheet>
+      )}
+      {pipelineRunSheetVisible && (
+        <PipelineRunSheet
+          hideModal={hidePipelineRunSheet}
+          run={runPipeline}
+          loading={pipelineRunning}
+        ></PipelineRunSheet>
+      )}
+      {globalParamSheetVisible && (
+        <GlobalParamSheet
+          data={{}}
+          hideModal={hideGlobalParamSheet}
+        ></GlobalParamSheet>
+      )}
+      {webhookTestSheetVisible && (
+        <WebhookSheet hideModal={hideWebhookTestSheet}></WebhookSheet>
       )}
     </section>
   );

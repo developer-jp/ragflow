@@ -34,7 +34,7 @@ const BreadcrumbItem = React.forwardRef<
   <li
     ref={ref}
     className={cn(
-      'inline-flex items-center gap-1.5 text-text-sub-title',
+      'inline-flex items-center gap-1.5 text-text-secondary',
       className,
     )}
     {...props}
@@ -69,7 +69,7 @@ const BreadcrumbPage = React.forwardRef<
     role="link"
     aria-disabled="true"
     aria-current="page"
-    className={cn('font-normal text-foreground', className)}
+    className={cn('font-normal text-foreground truncate max-w-40', className)}
     {...props}
   />
 ));

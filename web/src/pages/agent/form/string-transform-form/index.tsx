@@ -9,8 +9,9 @@ import {
 } from '@/components/ui/form';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { RAGFlowSelect } from '@/components/ui/select';
-import { buildOptions } from '@/utils/form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { t } from 'i18next';
+import { toLower } from 'lodash';
 import { memo, useCallback, useMemo } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
@@ -20,6 +21,7 @@ import {
   initialStringTransformValues,
 } from '../../constant';
 import { INextOperatorForm } from '../../interface';
+import { FormWrapper } from '../components/form-wrapper';
 import { Output, transferOutputs } from '../components/output';
 import { PromptEditor } from '../components/prompt-editor';
 import { QueryVariable } from '../components/query-variable';
@@ -27,7 +29,7 @@ import { useValues } from './use-values';
 import { useWatchFormChange } from './use-watch-form-change';
 
 const DelimiterOptions = Object.entries(StringTransformDelimiter).map(
-  ([key, val]) => ({ label: key, value: val }),
+  ([key, val]) => ({ label: t('flow.' + toLower(key)), value: val }),
 );
 
 function StringTransformForm({ node }: INextOperatorForm) {
@@ -76,24 +78,20 @@ function StringTransformForm({ node }: INextOperatorForm) {
 
   return (
     <Form {...form}>
-      <form
-        className="space-y-5 px-5 "
-        autoComplete="off"
-        onSubmit={(e) => {
-          e.preventDefault();
-        }}
-      >
+      <FormWrapper>
         <FormContainer>
           <FormField
             control={form.control}
             name="method"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>method</FormLabel>
+                <FormLabel>{t('flow.method')}</FormLabel>
                 <FormControl>
                   <RAGFlowSelect
                     {...field}
-                    options={buildOptions(StringTransformMethod)}
+                    options={Object.values(StringTransformMethod).map(
+                      (val) => ({ label: t('flow.' + val), value: val }),
+                    )}
                     onChange={(value) => {
                       handleMethodChange(value);
                       field.onChange(value);
@@ -116,7 +114,7 @@ function StringTransformForm({ node }: INextOperatorForm) {
               name="script"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>script</FormLabel>
+                  <FormLabel>{t('flow.script')}</FormLabel>
                   <FormControl>
                     <PromptEditor {...field} showToolbar={false}></PromptEditor>
                   </FormControl>
@@ -130,7 +128,7 @@ function StringTransformForm({ node }: INextOperatorForm) {
             name="delimiters"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>delimiters</FormLabel>
+                <FormLabel>{t('flow.delimiters')}</FormLabel>
                 <FormControl>
                   {isSplit ? (
                     <MultiSelect
@@ -157,7 +155,7 @@ function StringTransformForm({ node }: INextOperatorForm) {
             render={() => <div></div>}
           />
         </FormContainer>
-      </form>
+      </FormWrapper>
       <div className="p-5">
         <Output list={outputList}></Output>
       </div>
