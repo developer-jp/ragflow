@@ -36,7 +36,7 @@ import requests
 import websocket
 from pydantic import BaseModel, conint
 
-from rag.utils import num_tokens_from_string
+from common.token_utils import num_tokens_from_string
 
 
 class ServeReferenceAudio(BaseModel):
@@ -263,7 +263,7 @@ class SparkTTS(Base):
                 raise Exception(error)
 
             def on_close(self, ws, close_status_code, close_msg):
-                self.audio_queue.put(None)  # 放入 None 作为结束标志
+                self.audio_queue.put(None)  # None is terminator
 
             def on_open(self, ws):
                 def run(*args):
@@ -393,4 +393,20 @@ class DeepInfraTTS(OpenAITTS):
     def __init__(self, key, model_name, base_url="https://api.deepinfra.com/v1/openai", **kwargs):
         if not base_url:
             base_url = "https://api.deepinfra.com/v1/openai"
+        super().__init__(key, model_name, base_url, **kwargs)
+        
+class CometAPITTS(OpenAITTS):
+    _FACTORY_NAME = "CometAPI"
+
+    def __init__(self, key, model_name, base_url="https://api.cometapi.com/v1", **kwargs):
+        if not base_url:
+            base_url = "https://api.cometapi.com/v1"
+        super().__init__(key, model_name, base_url, **kwargs)
+        
+class DeerAPITTS(OpenAITTS):
+    _FACTORY_NAME = "DeerAPI"
+
+    def __init__(self, key, model_name, base_url="https://api.deerapi.com/v1", **kwargs):
+        if not base_url:
+            base_url = "https://api.deerapi.com/v1"
         super().__init__(key, model_name, base_url, **kwargs)

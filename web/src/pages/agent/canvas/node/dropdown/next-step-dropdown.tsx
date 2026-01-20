@@ -1,155 +1,113 @@
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
-import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { IModalProps } from '@/interfaces/common';
-import { Operator } from '@/pages/agent/constant';
-import { AgentInstanceContext, HandleContext } from '@/pages/agent/context';
-import OperatorIcon from '@/pages/agent/operator-icon';
-import { lowerFirst } from 'lodash';
-import { PropsWithChildren, createContext, memo, useContext } from 'react';
-import { useTranslation } from 'react-i18next';
-
-type OperatorItemProps = { operators: Operator[] };
-
-const HideModalContext = createContext<IModalProps<any>['showModal']>(() => {});
-
-function OperatorItemList({ operators }: OperatorItemProps) {
-  const { addCanvasNode } = useContext(AgentInstanceContext);
-  const { nodeId, id, position } = useContext(HandleContext);
-  const hideModal = useContext(HideModalContext);
-  const { t } = useTranslation();
-
-  return (
-    <ul className="space-y-2">
-      {operators.map((x) => {
-        return (
-          <Tooltip key={x}>
-            <TooltipTrigger asChild>
-              <DropdownMenuItem
-                key={x}
-                className="hover:bg-background-card py-1 px-3 cursor-pointer rounded-sm flex gap-2 items-center justify-start"
-                onClick={addCanvasNode(x, {
-                  nodeId,
-                  id,
-                  position,
-                })}
-                onSelect={() => hideModal?.()}
-              >
-                <OperatorIcon name={x}></OperatorIcon>
-                {t(`flow.${lowerFirst(x)}`)}
-              </DropdownMenuItem>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>{t(`flow.${lowerFirst(x)}Description`)}</p>
-            </TooltipContent>
-          </Tooltip>
-        );
-      })}
-    </ul>
-  );
-}
-
-function AccordionOperators() {
-  return (
-    <Accordion
-      type="multiple"
-      className="px-2 text-text-title max-h-[45vh] overflow-auto"
-      defaultValue={['item-1', 'item-2', 'item-3', 'item-4', 'item-5']}
-    >
-      <AccordionItem value="item-1">
-        <AccordionTrigger className="text-xl">Foundation</AccordionTrigger>
-        <AccordionContent className="flex flex-col gap-4 text-balance">
-          <OperatorItemList
-            operators={[Operator.Agent, Operator.Retrieval]}
-          ></OperatorItemList>
-        </AccordionContent>
-      </AccordionItem>
-      <AccordionItem value="item-2">
-        <AccordionTrigger className="text-xl">Dialogue </AccordionTrigger>
-        <AccordionContent className="flex flex-col gap-4 text-balance">
-          <OperatorItemList
-            operators={[Operator.Message, Operator.UserFillUp]}
-          ></OperatorItemList>
-        </AccordionContent>
-      </AccordionItem>
-      <AccordionItem value="item-3">
-        <AccordionTrigger className="text-xl">Flow</AccordionTrigger>
-        <AccordionContent className="flex flex-col gap-4 text-balance">
-          <OperatorItemList
-            operators={[
-              Operator.Switch,
-              Operator.Iteration,
-              Operator.Categorize,
-            ]}
-          ></OperatorItemList>
-        </AccordionContent>
-      </AccordionItem>
-      <AccordionItem value="item-4">
-        <AccordionTrigger className="text-xl">
-          Data Manipulation
-        </AccordionTrigger>
-        <AccordionContent className="flex flex-col gap-4 text-balance">
-          <OperatorItemList
-            operators={[Operator.Code, Operator.StringTransform]}
-          ></OperatorItemList>
-        </AccordionContent>
-      </AccordionItem>
-      <AccordionItem value="item-5">
-        <AccordionTrigger className="text-xl">Tools</AccordionTrigger>
-        <AccordionContent className="flex flex-col gap-4 text-balance">
-          <OperatorItemList
-            operators={[
-              Operator.TavilySearch,
-              Operator.TavilyExtract,
-              Operator.ExeSQL,
-              Operator.Google,
-              Operator.YahooFinance,
-              Operator.Email,
-              Operator.DuckDuckGo,
-              Operator.Wikipedia,
-              Operator.GoogleScholar,
-              Operator.ArXiv,
-              Operator.PubMed,
-              Operator.GitHub,
-              Operator.Invoke,
-              Operator.WenCai,
-            ]}
-          ></OperatorItemList>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
-  );
-}
+import { useIsPipeline } from '@/pages/agent/hooks/use-is-pipeline';
+import { t } from 'i18next';
+import { PropsWithChildren, memo, useEffect, useRef } from 'react';
+import {
+  AccordionOperators,
+  PipelineAccordionOperators,
+} from './accordion-operators';
+import { HideModalContext, OnNodeCreatedContext } from './operator-item-list';
 
 export function InnerNextStepDropdown({
   children,
   hideModal,
-}: PropsWithChildren & IModalProps<any>) {
+  position,
+  onNodeCreated,
+  nodeId,
+}: PropsWithChildren &
+  IModalProps<any> & {
+    position?: { x: number; y: number };
+    onNodeCreated?: (newNodeId: string) => void;
+    nodeId?: string;
+  }) {
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const isPipeline = useIsPipeline();
+
+  useEffect(() => {
+    if (position && hideModal) {
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+          hideModal();
+        }
+      };
+
+      document.addEventListener('keydown', handleKeyDown);
+
+      return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [position, hideModal]);
+
+  if (position) {
+    return (
+      <div
+        ref={dropdownRef}
+        style={{
+          position: 'fixed',
+          left: position.x,
+          top: position.y,
+          zIndex: 1000,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-[300px] font-semibold bg-bg-base border border-border rounded-md shadow-lg">
+          <div className="px-3 py-2 border-b border-border">
+            <div className="text-sm font-medium">{t('flow.nextStep')}</div>
+          </div>
+          <HideModalContext.Provider value={hideModal}>
+            <OnNodeCreatedContext.Provider value={onNodeCreated}>
+              {isPipeline ? (
+                <PipelineAccordionOperators
+                  isCustomDropdown={true}
+                  mousePosition={position}
+                  nodeId={nodeId}
+                ></PipelineAccordionOperators>
+              ) : (
+                <AccordionOperators
+                  isCustomDropdown={true}
+                  mousePosition={position}
+                  nodeId={nodeId}
+                ></AccordionOperators>
+              )}
+            </OnNodeCreatedContext.Provider>
+          </HideModalContext.Provider>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <DropdownMenu open onOpenChange={hideModal}>
+    <DropdownMenu
+      open={true}
+      onOpenChange={(open) => {
+        if (!open && hideModal) {
+          hideModal();
+        }
+      }}
+    >
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent
         onClick={(e) => e.stopPropagation()}
         className="w-[300px] font-semibold"
       >
-        <DropdownMenuLabel>Next Step</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs text-text-primary">
+          {t('flow.nextStep')}
+        </DropdownMenuLabel>
         <HideModalContext.Provider value={hideModal}>
-          <AccordionOperators></AccordionOperators>
+          {isPipeline ? (
+            <PipelineAccordionOperators
+              nodeId={nodeId}
+            ></PipelineAccordionOperators>
+          ) : (
+            <AccordionOperators nodeId={nodeId}></AccordionOperators>
+          )}
         </HideModalContext.Provider>
       </DropdownMenuContent>
     </DropdownMenu>

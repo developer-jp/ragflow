@@ -1,9 +1,13 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { t } from 'i18next';
 import { BrushCleaning } from 'lucide-react';
 import { ReactNode, useCallback } from 'react';
-import { ConfirmDeleteDialog } from './confirm-delete-dialog';
+import {
+  ConfirmDeleteDialog,
+  ConfirmDeleteDialogNode,
+} from './confirm-delete-dialog';
 import { Separator } from './ui/separator';
 
 export type BulkOperateItemType = {
@@ -40,11 +44,20 @@ export function BulkOperateBar({
           {list.map((x) => (
             <li
               key={x.id}
-              className={cn({ ['text-text-delete-red']: isDeleteItem(x.id) })}
+              className={cn({ ['text-state-error']: isDeleteItem(x.id) })}
             >
               <ConfirmDeleteDialog
                 hidden={!isDeleteItem(x.id)}
                 onOk={x.onClick}
+                title={t('deleteModal.delFiles')}
+                content={{
+                  title: t('common.deleteThem'),
+                  node: (
+                    <ConfirmDeleteDialogNode
+                      name={`${t('deleteModal.delFilesContent', { count })}`}
+                    ></ConfirmDeleteDialogNode>
+                  ),
+                }}
               >
                 <Button
                   variant={'ghost'}

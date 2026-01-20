@@ -45,9 +45,9 @@ class TestChatAssistantCreate:
             client.create_chat(name=name.upper())
 
         if expected_message:
-            with pytest.raises(Exception) as excinfo:
+            with pytest.raises(Exception) as exception_info:
                 client.create_chat(name=name)
-            assert expected_message in str(excinfo.value)
+            assert expected_message in str(exception_info.value)
         else:
             chat_assistant = client.create_chat(name=name)
             assert chat_assistant.name == name
@@ -68,9 +68,9 @@ class TestChatAssistantCreate:
             dataset_ids = dataset_ids(dataset.id)
 
         if expected_message:
-            with pytest.raises(Exception) as excinfo:
+            with pytest.raises(Exception) as exception_info:
                 client.create_chat(name="ragflow test", dataset_ids=dataset_ids)
-            assert expected_message in str(excinfo.value)
+            assert expected_message in str(exception_info.value)
         else:
             chat_assistant = client.create_chat(name="ragflow test", dataset_ids=dataset_ids)
             assert chat_assistant.name == "ragflow test"
@@ -121,9 +121,9 @@ class TestChatAssistantCreate:
         llm_o = Chat.LLM(client, llm)
 
         if expected_message:
-            with pytest.raises(Exception) as excinfo:
+            with pytest.raises(Exception) as exception_info:
                 client.create_chat(name="llm_test", dataset_ids=[dataset.id], llm=llm_o)
-            assert expected_message in str(excinfo.value)
+            assert expected_message in str(exception_info.value)
         else:
             chat_assistant = client.create_chat(name="llm_test", dataset_ids=[dataset.id], llm=llm_o)
             if llm:
@@ -189,9 +189,9 @@ class TestChatAssistantCreate:
         prompt_o = Chat.Prompt(client, prompt)
 
         if expected_message:
-            with pytest.raises(Exception) as excinfo:
+            with pytest.raises(Exception) as exception_info:
                 client.create_chat(name="prompt_test", dataset_ids=[dataset.id], prompt=prompt_o)
-            assert expected_message in str(excinfo.value)
+            assert expected_message in str(exception_info.value)
         else:
             chat_assistant = client.create_chat(name="prompt_test", dataset_ids=[dataset.id], prompt=prompt_o)
             if prompt:
@@ -207,11 +207,11 @@ class TestChatAssistantCreate:
                 assert attrgetter("variables")(chat_assistant.prompt) == [{"key": "knowledge", "optional": False}]
                 assert attrgetter("rerank_model")(chat_assistant.prompt) == ""
                 assert attrgetter("empty_response")(chat_assistant.prompt) == "Sorry! No relevant content was found in the knowledge base!"
-                assert attrgetter("opener")(chat_assistant.prompt) == "Hi! I'm your assistant, what can I do for you?"
+                assert attrgetter("opener")(chat_assistant.prompt) == "Hi! I'm your assistant. What can I do for you?"
                 assert attrgetter("show_quote")(chat_assistant.prompt) is True
                 assert (
                     attrgetter("prompt")(chat_assistant.prompt)
-                    == 'You are an intelligent assistant. Please summarize the content of the knowledge base to answer the question. Please list the data in the knowledge base and answer in detail. When all knowledge base content is irrelevant to the question, your answer must include the sentence "The answer you are looking for is not found in the knowledge base!" Answers need to consider chat history.\n      Here is the knowledge base:\n      {knowledge}\n      The above is the knowledge base.'
+                    == 'You are an intelligent assistant. Please summarize the content of the dataset to answer the question. Please list the data in the dataset and answer in detail. When all dataset content is irrelevant to the question, your answer must include the sentence "The answer you are looking for is not found in the dataset!" Answers need to consider chat history.\n      Here is the knowledge base:\n      {knowledge}\n      The above is the knowledge base.'
                 )
 
 
@@ -219,6 +219,6 @@ class TestChatAssistantCreate2:
     @pytest.mark.p2
     def test_unparsed_document(self, client, add_document):
         dataset, _ = add_document
-        with pytest.raises(Exception) as excinfo:
+        with pytest.raises(Exception) as exception_info:
             client.create_chat(name="prompt_test", dataset_ids=[dataset.id])
-        assert "doesn't own parsed file" in str(excinfo.value)
+        assert "doesn't own parsed file" in str(exception_info.value)

@@ -44,6 +44,7 @@ class Document(Base):
         self.process_duration = 0.0
         self.run = "0"
         self.status = "1"
+        self.meta_fields = {}
         for k in list(res_dict.keys()):
             if k not in self.__dict__:
                 res_dict.pop(k)
@@ -68,7 +69,7 @@ class Document(Base):
             response = res.json()
             actual_keys = set(response.keys())
             if actual_keys == error_keys:
-                raise Exception(res.get("message"))
+                raise Exception(response.get("message"))
             else:
                 return res.content
         except json.JSONDecodeError:

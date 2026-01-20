@@ -9,7 +9,7 @@ import {
   FormLabel,
   FormMessage,
 } from '../ui/form';
-import { Input } from '../ui/input';
+import { NumberInput } from '../ui/input';
 import { Switch } from '../ui/switch';
 
 type SliderInputSwitchFormFieldProps = {
@@ -19,8 +19,10 @@ type SliderInputSwitchFormFieldProps = {
   name: string;
   label: string;
   defaultValue?: number;
+  onChange?: (value: number) => void;
   className?: string;
   checkName: string;
+  numberInputClassName?: string;
 };
 
 export function SliderInputSwitchFormField({
@@ -30,8 +32,10 @@ export function SliderInputSwitchFormField({
   label,
   name,
   defaultValue,
+  onChange,
   className,
   checkName,
+  numberInputClassName,
 }: SliderInputSwitchFormFieldProps) {
   const form = useFormContext();
   const disabled = !form.watch(checkName);
@@ -66,6 +70,10 @@ export function SliderInputSwitchFormField({
             <FormControl>
               <SingleFormSlider
                 {...field}
+                onChange={(value: number) => {
+                  onChange?.(value);
+                  field.onChange(value);
+                }}
                 max={max}
                 min={min}
                 step={step}
@@ -73,15 +81,21 @@ export function SliderInputSwitchFormField({
               ></SingleFormSlider>
             </FormControl>
             <FormControl>
-              <Input
+              <NumberInput
                 disabled={disabled}
-                type={'number'}
-                className="h-7 w-20"
+                className={cn(
+                  'h-6 w-10 p-1 border border-border-button rounded-sm',
+                  numberInputClassName,
+                )}
                 max={max}
                 min={min}
                 step={step}
                 {...field}
-              ></Input>
+                onChange={(value: number) => {
+                  onChange?.(value);
+                  field.onChange(value);
+                }}
+              ></NumberInput>
             </FormControl>
           </div>
           <FormMessage />

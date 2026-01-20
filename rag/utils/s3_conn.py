@@ -20,8 +20,9 @@ from botocore.exceptions import ClientError
 from botocore.config import Config
 import time
 from io import BytesIO
-from rag.utils import singleton
-from rag import settings
+from common.decorator import singleton
+from common import settings
+
 
 @singleton
 class RAGFlowS3:
@@ -31,7 +32,7 @@ class RAGFlowS3:
         self.access_key = self.s3_config.get('access_key', None)
         self.secret_key = self.s3_config.get('secret_key', None)
         self.session_token = self.s3_config.get('session_token', None)
-        self.region = self.s3_config.get('region', None)
+        self.region_name = self.s3_config.get('region_name', None)
         self.endpoint_url = self.s3_config.get('endpoint_url', None)
         self.signature_version = self.s3_config.get('signature_version', None)
         self.addressing_style = self.s3_config.get('addressing_style', None)
@@ -45,6 +46,7 @@ class RAGFlowS3:
             # If there is a default bucket, use the default bucket
             actual_bucket = self.bucket if self.bucket else bucket
             return method(self, actual_bucket, *args, **kwargs)
+
         return wrapper
 
     @staticmethod
@@ -56,6 +58,7 @@ class RAGFlowS3:
             if self.prefix_path:
                 fnm = f"{self.prefix_path}/{bucket}/{fnm}"
             return method(self, bucket, fnm, *args, **kwargs)
+
         return wrapper
 
     def __open__(self):
@@ -76,20 +79,23 @@ class RAGFlowS3:
                     'aws_secret_access_key': self.secret_key,
                     'aws_session_token': self.session_token,
                 }
-            if self.region:
-                s3_params['region_name'] = self.region
+            if self.region_name:
+                s3_params['region_name'] = self.region_name
             if self.endpoint_url:
                 s3_params['endpoint_url'] = self.endpoint_url
+
+            # Configure signature_version and addressing_style through Config object
             if self.signature_version:
-                s3_params['signature_version'] = self.signature_version
+                config_kwargs['signature_version'] = self.signature_version
             if self.addressing_style:
-                s3_params['addressing_style'] = self.addressing_style
+                config_kwargs['s3'] = {'addressing_style': self.addressing_style}
+
             if config_kwargs:
                 s3_params['config'] = Config(**config_kwargs)
-            
+
             self.conn = [boto3.client('s3', **s3_params)]
         except Exception:
-            logging.exception(f"Fail to connect at region {self.region} or endpoint {self.endpoint_url}")
+            logging.exception(f"Fail to connect at region {self.region_name} or endpoint {self.endpoint_url}")
 
     def __close__(self):
         del self.conn[0]
@@ -160,7 +166,7 @@ class RAGFlowS3:
                 logging.exception(f"fail get {bucket}/{fnm}")
                 self.__open__()
                 time.sleep(1)
-        return
+        return None
 
     @use_prefix_path
     @use_default_bucket
@@ -180,13 +186,26 @@ class RAGFlowS3:
         for _ in range(10):
             try:
                 r = self.conn[0].generate_presigned_url('get_object',
-                                                     Params={'Bucket': bucket,
-                                                             'Key': fnm},
-                                                     ExpiresIn=expires)
+                                                        Params={'Bucket': bucket,
+                                                                'Key': fnm},
+                                                        ExpiresIn=expires)
 
                 return r
             except Exception:
                 logging.exception(f"fail get url {bucket}/{fnm}")
                 self.__open__()
                 time.sleep(1)
-        return
+        return None
+
+    @use_default_bucket
+    def rm_bucket(self, bucket, *args, **kwargs):
+        for conn in self.conn:
+            try:
+                if not conn.bucket_exists(bucket):
+                    continue
+                for o in conn.list_objects_v2(Bucket=bucket):
+                    conn.delete_object(bucket, o.object_name)
+                conn.delete_bucket(Bucket=bucket)
+                return
+            except Exception as e:
+                logging.error(f"Fail rm {bucket}: " + str(e))

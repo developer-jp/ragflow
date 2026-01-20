@@ -7,7 +7,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ChunkCard from './components/chunk-card';
 import CreatingModal from './components/chunk-creating-modal';
-import DocumentPreview from './components/document-preview';
 import {
   useChangeChunkTextMode,
   useDeleteChunkByIds,
@@ -18,8 +17,11 @@ import {
 
 import ChunkResultBar from './components/chunk-result-bar';
 import CheckboxSets from './components/chunk-result-bar/checkbox-sets';
-import DocumentHeader from './components/document-preview/document-header';
+// import DocumentHeader from './components/document-preview/document-header';
 
+import DocumentPreview from '@/components/document-preview';
+import DocumentHeader from '@/components/document-preview/document-header';
+import { useGetDocumentUrl } from '@/components/document-preview/hooks';
 import { PageHeader } from '@/components/page-header';
 import {
   Breadcrumb,
@@ -40,7 +42,7 @@ import {
   useNavigatePage,
 } from '@/hooks/logic-hooks/navigate-hooks';
 import { useFetchKnowledgeBaseConfiguration } from '@/hooks/use-knowledge-request';
-import styles from './index.less';
+import styles from './index.module.less';
 
 const Chunk = () => {
   const [selectedChunkIds, setSelectedChunkIds] = useState<string[]>([]);
@@ -53,6 +55,7 @@ const Chunk = () => {
     handleInputChange,
     available,
     handleSetAvailable,
+    dataUpdatedAt,
   } = useFetchNextChunkList();
   const { handleChunkCardClick, selectedChunkId } = useHandleChunkCardClick();
   const isPdf = documentInfo?.type === 'pdf';
@@ -71,8 +74,9 @@ const Chunk = () => {
     chunkUpdatingVisible,
     documentId,
   } = useUpdateChunk();
-  const { navigateToDataset, getQueryString, navigateToDatasetList } =
+  const { navigateToDataFile, getQueryString, navigateToDatasetList } =
     useNavigatePage();
+  const fileUrl = useGetDocumentUrl(false);
   useEffect(() => {
     setChunkList(data);
   }, [data]);
@@ -164,9 +168,11 @@ const Chunk = () => {
       case 'doc':
         return documentInfo?.name.split('.').pop() || 'doc';
       case 'visual':
+        return documentInfo?.name.split('.').pop() || 'visual';
       case 'docx':
       case 'txt':
       case 'md':
+      case 'mdx':
       case 'pdf':
         return documentInfo?.type;
     }
@@ -186,7 +192,7 @@ const Chunk = () => {
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbLink
-                onClick={navigateToDataset(
+                onClick={navigateToDataFile(
                   getQueryString(QueryStringMap.id) as string,
                 )}
               >
@@ -195,7 +201,7 @@ const Chunk = () => {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>{documentInfo.name}</BreadcrumbPage>
+              <BreadcrumbPage>{documentInfo?.name}</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
@@ -212,6 +218,7 @@ const Chunk = () => {
                 fileType={fileType}
                 highlights={highlights}
                 setWidthAndHeight={setWidthAndHeight}
+                url={fileUrl}
               ></DocumentPreview>
             </section>
           </div>
@@ -225,7 +232,7 @@ const Chunk = () => {
               <div className="h-[100px] flex flex-col justify-end pb-[5px]">
                 <div>
                   <h2 className="text-[24px]">{t('chunk.chunkResult')}</h2>
-                  <div className="text-[14px] text-[#979AAB]">
+                  <div className="text-[14px] text-text-secondary">
                     {t('chunk.chunkResultTip')}
                   </div>
                 </div>
@@ -246,6 +253,7 @@ const Chunk = () => {
                     switchChunk={handleSwitchChunk}
                     removeChunk={handleRemoveChunk}
                     checked={selectedChunkIds.length === data.length}
+                    selectedChunkIds={selectedChunkIds}
                   />
                 </div>
                 <div className={styles.pageContent}>
@@ -271,6 +279,7 @@ const Chunk = () => {
                         clickChunkCard={handleChunkCardClick}
                         selected={item.chunk_id === selectedChunkId}
                         textMode={textMode}
+                        t={dataUpdatedAt}
                       ></ChunkCard>
                     ))}
                   </div>

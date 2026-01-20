@@ -1,4 +1,7 @@
-import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
+import {
+  ConfirmDeleteDialog,
+  ConfirmDeleteDialogNode,
+} from '@/components/confirm-delete-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,9 +48,20 @@ export function ChatDropdown({
           {t('common.rename')} <PenLine />
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <ConfirmDeleteDialog onOk={handleDelete}>
+        <ConfirmDeleteDialog
+          onOk={handleDelete}
+          title={t('deleteModal.delChat')}
+          content={{
+            node: (
+              <ConfirmDeleteDialogNode
+                avatar={{ avatar: chat.icon, name: chat.name }}
+                name={chat.name}
+              />
+            ),
+          }}
+        >
           <DropdownMenuItem
-            className="text-text-delete-red"
+            className="text-state-error"
             onSelect={(e) => {
               e.preventDefault();
             }}

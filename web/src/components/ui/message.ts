@@ -1,29 +1,19 @@
-import { toast } from 'sonner';
+import { ExternalToast, toast } from 'sonner';
+
+const configuration: ExternalToast = { duration: 2500, position: 'top-center' };
 
 const message = {
   success: (msg: string) => {
-    toast.success(msg, {
-      position: 'top-center',
-      closeButton: false,
-    });
+    toast.success(msg, configuration);
   },
   error: (msg: string) => {
-    toast.error(msg, {
-      position: 'top-center',
-      closeButton: false,
-    });
+    toast.error(msg, configuration);
   },
   warning: (msg: string) => {
-    toast.warning(msg, {
-      position: 'top-center',
-      closeButton: false,
-    });
+    toast.warning(msg, configuration);
   },
   info: (msg: string) => {
-    toast.info(msg, {
-      position: 'top-center',
-      closeButton: false,
-    });
+    toast.info(msg, configuration);
   },
 };
 export default message;

@@ -1,8 +1,10 @@
-import { PromptIcon } from '@/assets/icon/Icon';
+import { PromptIcon } from '@/assets/icon/next-icon';
 import CopyToClipboard from '@/components/copy-to-clipboard';
 import { useSetModalState } from '@/hooks/common-hooks';
 import { IRemoveMessageById } from '@/hooks/logic-hooks';
 import { AgentChatContext } from '@/pages/agent/context';
+import { downloadFile } from '@/services/file-manager-service';
+import { downloadFileFromBlob } from '@/utils/file-util';
 import {
   DeleteOutlined,
   DislikeOutlined,
@@ -12,13 +14,13 @@ import {
   SyncOutlined,
 } from '@ant-design/icons';
 import { Radio, Tooltip } from 'antd';
-import { NotebookText } from 'lucide-react';
+import { Download, NotebookText } from 'lucide-react';
 import { useCallback, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
+import FeedbackDialog from '../feedback-dialog';
+import { PromptDialog } from '../prompt-dialog';
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group';
-import FeedbackModal from './feedback-modal';
 import { useRemoveMessage, useSendFeedback, useSpeech } from './hooks';
-import PromptModal from './prompt-modal';
 
 interface IProps {
   messageId: string;
@@ -28,6 +30,11 @@ interface IProps {
   audioBinary?: string;
   showLoudspeaker?: boolean;
   showLog?: boolean;
+  attachment?: {
+    file_name: string;
+    doc_id: string;
+    format: string;
+  };
 }
 
 export const AssistantGroupButton = ({
@@ -38,6 +45,7 @@ export const AssistantGroupButton = ({
   showLikeButton,
   showLoudspeaker = true,
   showLog = true,
+  attachment,
 }: IProps) => {
   const { visible, hideModal, showModal, onFeedbackOk, loading } =
     useSendFeedback(messageId);
@@ -98,79 +106,42 @@ export const AssistantGroupButton = ({
             <NotebookText className="size-4" />
           </ToggleGroupItem>
         )}
+        {!!attachment?.doc_id && (
+          <ToggleGroupItem
+            value="g"
+            onClick={async () => {
+              try {
+                const response = await downloadFile({
+                  docId: attachment.doc_id,
+                  ext: attachment.format,
+                });
+                const blob = new Blob([response.data], {
+                  type: response.data.type,
+                });
+                downloadFileFromBlob(blob, attachment.file_name);
+              } catch (error) {
+                console.error('Download failed:', error);
+              }
+            }}
+          >
+            <Download size={16} />
+          </ToggleGroupItem>
+        )}
       </ToggleGroup>
       {visible && (
-        <FeedbackModal
+        <FeedbackDialog
           visible={visible}
           hideModal={hideModal}
           onOk={onFeedbackOk}
           loading={loading}
-        ></FeedbackModal>
+        ></FeedbackDialog>
       )}
       {promptVisible && (
-        <PromptModal
+        <PromptDialog
           visible={promptVisible}
           hideModal={hidePromptModal}
           prompt={prompt}
-        ></PromptModal>
-      )}
-    </>
-  );
-
-  return (
-    <>
-      <Radio.Group size="small">
-        <Radio.Button value="a">
-          <CopyToClipboard text={content}></CopyToClipboard>
-        </Radio.Button>
-        {showLoudspeaker && (
-          <Radio.Button value="b" onClick={handleRead}>
-            <Tooltip title={t('chat.read')}>
-              {isPlaying ? <PauseCircleOutlined /> : <SoundOutlined />}
-            </Tooltip>
-            <audio src="" ref={ref}></audio>
-          </Radio.Button>
-        )}
-        {showLikeButton && (
-          <>
-            <Radio.Button value="c" onClick={handleLike}>
-              <LikeOutlined />
-            </Radio.Button>
-            <Radio.Button value="d" onClick={showModal}>
-              <DislikeOutlined />
-            </Radio.Button>
-          </>
-        )}
-        {prompt && (
-          <Radio.Button value="e" onClick={showPromptModal}>
-            <PromptIcon style={{ fontSize: '16px' }} />
-          </Radio.Button>
-        )}
-        <Radio.Button
-          value="f"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleShowLogSheet();
-          }}
-        >
-          <NotebookText className="size-4" />
-        </Radio.Button>
-      </Radio.Group>
-      {visible && (
-        <FeedbackModal
-          visible={visible}
-          hideModal={hideModal}
-          onOk={onFeedbackOk}
-          loading={loading}
-        ></FeedbackModal>
-      )}
-      {promptVisible && (
-        <PromptModal
-          visible={promptVisible}
-          hideModal={hidePromptModal}
-          prompt={prompt}
-        ></PromptModal>
+        ></PromptDialog>
       )}
     </>
   );

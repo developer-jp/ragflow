@@ -196,6 +196,9 @@ export default {
     knowledgeConfiguration: {
       titleDescription:
         'Modifiez ici la configuration de votre base de connaissances, notamment la méthode de découpage.',
+      imageTableContextWindow: 'Fenêtre de contexte image & tableau',
+      imageTableContextWindowTip:
+        "Capture N jetons de texte au-dessus et au-dessous de l'image et du tableau pour fournir un contexte plus riche.",
       name: 'Nom de la base de connaissances',
       photo: 'Photo de la base de connaissances',
       photoTip: 'Vous pouvez téléverser un fichier de 4 Mo',
@@ -208,7 +211,7 @@ export default {
       chunkTokenNumber: 'Taille de segment recommandée',
       chunkTokenNumberMessage: 'Le nombre de tokens par segment est requis',
       embeddingModelTip:
-        'Modèle d’embedding par défaut. Ne peut pas être modifié si la base contient déjà des segments. Pour le changer, vous devez supprimer tous les segments existants.',
+        'Modèle d’embedding par défaut de la base de connaissances. Une fois que la base de connaissances contient des segments, lors du changement de modèle d’embedding, le système prélève aléatoirement quelques segments pour un contrôle de compatibilité, les ré-encode avec le nouveau modèle d’embedding et calcule la similarité cosinus entre les nouveaux et anciens vecteurs. Le basculement est autorisé uniquement si la similarité moyenne de l’échantillon est ≥ 0.9. Sinon, vous devez supprimer tous les segments de la base de connaissances avant de pouvoir le modifier.',
       permissionsTip:
         "Si défini sur 'Équipe', tous les membres de votre équipe pourront gérer cette base.",
       chunkTokenNumberTip:
@@ -240,9 +243,8 @@ export default {
       promptTip:
         'Décrivez la tâche attendue du LLM, ses réponses, ses exigences, etc. Utilisez `/` pour afficher les variables disponibles.',
       promptMessage: 'Le prompt est requis',
-      promptText: `Veuillez résumer les paragraphes suivants. Attention aux chiffres, ne pas inventer. Paragraphes suivants : {cluster_content
-      }
-    Le contenu à résumer est ci-dessus.`,
+      promptText: `Veuillez résumer les paragraphes suivants. Attention aux chiffres, ne pas inventer. Paragraphes suivants : {cluster_content}
+  Le contenu à résumer est ci-dessus.`,
       maxToken: 'Nombre maximal de tokens',
       maxTokenTip: 'Nombre maximal de tokens générés par résumé.',
       maxTokenMessage: 'Nombre maximal de tokens requis',
@@ -291,6 +293,17 @@ export default {
       communityTip: `Un "community" est un groupe d’entités liées. Le LLM peut générer un résumé pour chaque groupe. Voir plus ici : https: //www.microsoft.com/en-us/research/blog/graphrag-improving-global-search-via-dynamic-community-selection/`,
       theDocumentBeingParsedCannotBeDeleted:
         'Le document en cours d’analyse ne peut pas être supprimé',
+      paddleocrOptions: 'Options PaddleOCR',
+      paddleocrApiUrl: 'URL de l’API PaddleOCR',
+      paddleocrApiUrlTip: 'URL du point de terminaison de l’API du service PaddleOCR',
+      paddleocrApiUrlPlaceholder: 'Par exemple : https://paddleocr-server.com/layout-parsing',
+      paddleocrAccessToken: 'Jeton d’accès AI Studio',
+      paddleocrAccessTokenTip: 'Jeton d’accès à l’API PaddleOCR (optionnel)',
+      paddleocrAccessTokenPlaceholder: 'Votre jeton AI Studio (optionnel)',
+      paddleocrAlgorithm: 'Algorithme PaddleOCR',
+      paddleocrAlgorithmTip: 'Algorithme utilisé pour l’analyse PaddleOCR',
+      paddleocrSelectAlgorithm: 'Sélectionner un algorithme',
+      paddleocrModelNamePlaceholder: 'Par exemple : paddleocr-environnement-1',
     },
     chunk: {
       chunk: 'Segment',
@@ -523,6 +536,14 @@ export default {
       baseUrl: 'URL de base',
       baseUrlTip:
         "Si votre clé API provient d'OpenAI, ignorez ceci. Tout autre fournisseur intermédiaire fournira cette URL de base avec la clé API.",
+      tongyiBaseUrlTip:
+        'Pour les utilisateurs chinois, pas besoin de remplir ou utiliser https://dashscope.aliyuncs.com/compatible-mode/v1. Pour les utilisateurs internationaux, utilisez https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+      tongyiBaseUrlPlaceholder:
+        "(Utilisateurs internationaux uniquement, veuillez consulter l'astuce)",
+      minimaxBaseUrlTip:
+        'Utilisateurs internationaux uniquement : utilisez https://api.minimax.io/v1.',
+      minimaxBaseUrlPlaceholder:
+        '(Utilisateurs internationaux uniquement, renseignez https://api.minimax.io/v1)',
       modify: 'Modifier',
       systemModelSettings: 'Définir les modèles par défaut',
       chatModel: 'Modèle de chat',
@@ -556,6 +577,17 @@ export default {
       modelTypeMessage: 'Veuillez saisir le type de votre modèle !',
       addLlmBaseUrl: 'URL de base',
       baseUrlNameMessage: 'Veuillez saisir votre URL de base !',
+      paddleocr: {
+        apiUrl: 'URL de l’API PaddleOCR',
+        apiUrlPlaceholder: 'Par exemple : https://paddleocr-server.com/layout-parsing',
+        accessToken: 'Jeton d’accès AI Studio',
+        accessTokenPlaceholder: 'Votre jeton AI Studio (optionnel)',
+        algorithm: 'Algorithme PaddleOCR',
+        selectAlgorithm: 'Sélectionner un algorithme',
+        modelNamePlaceholder: 'Par exemple : paddleocr-from-env-1',
+        modelNameRequired: 'Le nom du modèle est obligatoire',
+        apiUrlRequired: 'L’URL de l’API PaddleOCR est obligatoire'
+      },
       vision: 'Supporte-t-il la vision ?',
       ollamaLink: 'Comment intégrer {{name}}',
       FishAudioLink: 'Comment utiliser FishAudio',
@@ -781,12 +813,31 @@ export default {
         'Un composant qui recherche sur baidu.com, utilisant TopN pour spécifier le nombre de résultats. Il complète les bases de connaissances existantes.',
       duckDuckGo: 'DuckDuckGo',
       duckDuckGoDescription:
-        'Un composant qui recherche sur duckduckgo.com, vous permettant de spécifier le nombre de résultats avec TopN. Il complète les bases de connaissances existantes.',
-      channel: 'Canal',
-      channelTip:
-        "Effectuer une recherche de texte ou d'actualités sur l'entrée du composant",
-      text: 'Texte',
-      news: 'Actualités',
+        'Un composant qui recherche sur duckduckgo.com, vous permettant de spécifier le nombre de résultats de recherche avec TopN. Il complète les bases de connaissances existantes.',
+      searXNG: 'SearXNG',
+      searXNGDescription:
+        "Un composant qui effectue des recherches via la URL de l'instance de SearXNG que vous fournissez. Spécifiez TopN et l'URL de l'instance.",
+      pdfGenerator: 'Générateur de Documents',
+      pDFGenerator: 'Générateur de Documents',
+      pdfGeneratorDescription: `Un composant qui génère des documents (PDF, DOCX, TXT) à partir de contenu formaté en markdown avec un style personnalisable, des images et des tableaux. Prend en charge : **gras**, *italique*, # titres, - listes, tableaux avec syntaxe |.`,
+      pDFGeneratorDescription: `Un composant qui génère des documents (PDF, DOCX, TXT) à partir de contenu formaté en markdown avec un style personnalisable, des images et des tableaux. Prend en charge : **gras**, *italique*, # titres, - listes, tableaux avec syntaxe |.`,
+      subtitle: 'Sous-titre',
+      logoImage: 'Image Logo',
+      logoPosition: 'Position Logo',
+      logoWidth: 'Largeur Logo',
+      logoHeight: 'Hauteur Logo',
+      fontFamily: 'Famille Police',
+      fontSize: 'Taille Police',
+      titleFontSize: 'Taille Police Titre',
+      pageSize: 'Taille Page',
+      orientation: 'Orientation',
+      marginTop: 'Marge Supérieure',
+      marginBottom: 'Marge Inférieure',
+      filename: 'Nom Fichier',
+      outputDirectory: 'Répertoire Sortie',
+      addPageNumbers: 'Ajouter Numéros Page',
+      addTimestamp: 'Ajouter Timestamp',
+      watermarkText: 'Texte Filigrane',
       messageHistoryWindowSize:
         "Taille de la fenêtre d'historique des messages",
       messageHistoryWindowSizeTip:
@@ -1090,6 +1141,8 @@ export default {
       cleanHtml: 'Nettoyer le HTML',
       cleanHtmlTip:
         'Si la réponse est au format HTML et que seul le contenu principal est souhaité, activez cette option.',
+      invalidUrl:
+        'Doit être une URL valide ou une URL avec des espaces réservés de variables au format {nom_variable} ou {composant@variable}',
       reference: 'Référence',
       input: 'Entrée',
       output: 'Sortie',
@@ -1146,7 +1199,6 @@ export default {
       },
       addVariable: 'Ajouter une variable',
       variableSettings: 'Paramètres des variables',
-      globalVariables: 'Variables globales',
       systemPrompt: 'Invite système',
       addCategory: 'Ajouter une catégorie',
       categoryName: 'Nom de la catégorie',
@@ -1161,8 +1213,7 @@ export default {
       }`,
       datatype: 'Type MIME de la requête HTTP',
       insertVariableTip: `Entrer / Insérer des variables`,
-      historyversion: 'Historique des versions',
-      filename: 'Nom du fichier',
+      historyVersion: 'Historique des versions',
       version: {
         created: 'Créé',
         details: 'Détails de la version',

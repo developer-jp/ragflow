@@ -14,9 +14,9 @@ import 'katex/dist/katex.min.css'; // `rehype-katex` does not import the CSS for
 
 import { preprocessLaTeX } from '@/utils/chat';
 import { useIsDarkTheme } from '../theme-provider';
-import styles from './index.less';
+import styles from './index.module.less';
 
-const HightLightMarkdown = ({
+const HighLightMarkdown = ({
   children,
 }: {
   children: string | null | undefined;
@@ -31,7 +31,7 @@ const HightLightMarkdown = ({
       components={
         {
           code(props: any) {
-            const { children, className, node, ...rest } = props;
+            const { children, className, ...rest } = props;
             const match = /language-(\w+)/.exec(className || '');
             return match ? (
               <SyntaxHighlighter
@@ -56,4 +56,4 @@ const HightLightMarkdown = ({
   );
 };
 
-export default HightLightMarkdown;
+export default HighLightMarkdown;

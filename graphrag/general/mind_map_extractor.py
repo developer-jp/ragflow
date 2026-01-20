@@ -14,12 +14,12 @@
 #  limitations under the License.
 #
 
+import asyncio
 import logging
 import collections
 import re
 from typing import Any
 from dataclasses import dataclass
-import trio
 
 from graphrag.general.extractor import Extractor
 from graphrag.general.mind_map_prompt import MIND_MAP_EXTRACTION_PROMPT
@@ -27,8 +27,9 @@ from graphrag.utils import ErrorHandlerFn, perform_variable_replacements, chat_l
 from rag.llm.chat_model import Base as CompletionLLM
 import markdown_to_json
 from functools import reduce
-from rag.utils import num_tokens_from_string
+from common.token_utils import num_tokens_from_string
 
+from common.misc_utils import thread_pool_exec
 
 @dataclass
 class MindMapResult:
@@ -89,17 +90,30 @@ class MindMapExtractor(Extractor):
         token_count = max(self._llm.max_length * 0.8, self._llm.max_length - 512)
         texts = []
         cnt = 0
-        async with trio.open_nursery() as nursery:
-            for i in range(len(sections)):
-                section_cnt = num_tokens_from_string(sections[i])
-                if cnt + section_cnt >= token_count and texts:
-                    nursery.start_soon(self._process_document, "".join(texts), prompt_variables, res)
-                    texts = []
-                    cnt = 0
-                texts.append(sections[i])
-                cnt += section_cnt
-            if texts:
-                nursery.start_soon(self._process_document, "".join(texts), prompt_variables, res)
+        tasks = []
+        for i in range(len(sections)):
+            section_cnt = num_tokens_from_string(sections[i])
+            if cnt + section_cnt >= token_count and texts:
+                tasks.append(asyncio.create_task(
+                    self._process_document("".join(texts), prompt_variables, res)
+                ))
+                texts = []
+                cnt = 0
+
+            texts.append(sections[i])
+            cnt += section_cnt
+        if texts:
+            tasks.append(asyncio.create_task(
+                self._process_document("".join(texts), prompt_variables, res)
+            ))
+        try:
+            await asyncio.gather(*tasks, return_exceptions=False)
+        except Exception as e:
+            logging.error(f"Error processing document: {e}")
+            for t in tasks:
+                t.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            raise
         if not res:
             return MindMapResult(output={"id": "root", "children": []})
         merge_json = reduce(self._merge, res)
@@ -172,7 +186,7 @@ class MindMapExtractor(Extractor):
         }
         text = perform_variable_replacements(self._mind_map_prompt, variables=variables)
         async with chat_limiter:
-            response = await trio.to_thread.run_sync(lambda: self._chat(text, [{"role": "user", "content": "Output:"}], {}))
+            response = await thread_pool_exec(self._chat,text,[{"role": "user", "content": "Output:"}],{})
         response = re.sub(r"```[^\n]*", "", response)
         logging.debug(response)
         logging.debug(self._todict(markdown_to_json.dictify(response)))
