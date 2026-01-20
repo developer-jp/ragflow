@@ -45,7 +45,7 @@ export function NextBanner() {
     <section className="text-5xl pt-10 pb-14 font-bold px-10">
       <span className="text-text-primary">{t('header.welcome')}</span>
       <span className="pl-3 text-transparent bg-clip-text  bg-gradient-to-l from-[#40EBE3] to-[#4A51FF]">
-        RAGFlow
+        WAZA-ARI
       </span>
     </section>
   );
